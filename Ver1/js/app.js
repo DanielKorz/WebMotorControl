@@ -23,6 +23,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const ticksCanvas = document.getElementById("ticksCanvas");
     const presetButtons = document.querySelectorAll(".preset-row button");
 
+    const maxVInput = document.getElementById("maxVInput");
+    const maxIInput = document.getElementById("maxIInput");
+    const chkLogRx = document.getElementById("chkLogRx");
+    const statusAge = document.getElementById("statusAge");
+    const rxDiag = document.getElementById("rxDiag");
+    const chkHexDump = document.getElementById("chkHexDump");
+
     const chkPeriodic = document.getElementById("chkPeriodic");
     const btnReqStatus = document.getElementById("btnReqStatus");
     const btnFindZero = document.getElementById("btnFindZero");
@@ -47,6 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
         id: document.getElementById("stat_id"),
         vq: document.getElementById("stat_vq"),
         vd: document.getElementById("stat_vd"),
+        vdq: document.getElementById("stat_vdq"),
         pcbTemp: document.getElementById("stat_pcbTemp"),
         motorTemp: document.getElementById("stat_motorTemp"),
         faultWord: document.getElementById("stat_faultWord")
@@ -59,13 +67,28 @@ document.addEventListener("DOMContentLoaded", () => {
         onConnectionChange: handleConnectionChange,
         onTx: handleTxPacket,
         onRxBytes: handleRxBytes,
-        onError: handleProtocolError
+        onError: handleProtocolError,
+        onStatusStale: handleStatusStale
     });
 
     // Check browser compatibility
+    const isFirefox = /firefox/i.test(navigator.userAgent);
+
     if (!serial.isSupported()) {
         compatWarning.style.display = "block";
         btnConnect.disabled = true;
+    }
+
+    if (isFirefox) {
+        // Firefox has no native Web Serial. An add-on may provide navigator.serial, but
+        // reception has been seen to fail (demands go out, no status comes back).
+        compatWarning.innerHTML = serial.isSupported()
+            ? "⚠️ <strong>Firefox detected.</strong> Firefox does not natively support Web Serial; " +
+              "sending may work but received status data may not be displayed. " +
+              "Please use Google Chrome, Microsoft Edge, Opera or Brave."
+            : "⚠️ <strong>Firefox does not support Web Serial.</strong> " +
+              "Please use Google Chrome, Microsoft Edge, Opera or Brave to connect over serial.";
+        compatWarning.style.display = "block";
     }
 
     // ---------------- 3. Connection Handlers ----------------
@@ -107,6 +130,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // ---------------- Version ----------------
+    const appVersionEl = document.getElementById("appVersion");
+    appVersionEl.textContent = `v${APP_VERSION}`;
+    appVersionEl.title = "Web app version - latest changes:\n- " + APP_CHANGELOG[0].changes.join("\n- ");
+    document.title += ` v${APP_VERSION}`;
+
     function handleConnectionChange(connected, message) {
         const configInputs = [baudSelect, dataBitsSelect, stopBitsSelect, paritySelect, flowControlSelect];
         configInputs.forEach(el => { if (el) el.disabled = connected; });
@@ -118,8 +147,10 @@ document.addEventListener("DOMContentLoaded", () => {
             statusText.textContent = "Connected";
             chkDtr.checked = serial.dtrState;
             chkRts.checked = serial.rtsState;
-            appendLog(`--- ${message} ---\n`);
+            resetStatusPanel(true);
+            appendLog(`--- ${message} (web app v${APP_VERSION}) ---\n`);
         } else {
+            resetStatusPanel(false);
             btnConnect.textContent = "Connect Serial";
             btnConnect.className = "btn btn-primary";
             statusBadge.className = "status-badge disconnected";
@@ -176,6 +207,34 @@ document.addEventListener("DOMContentLoaded", () => {
     chkPeriodic.addEventListener("change", () => {
         serial.periodicSend = chkPeriodic.checked;
     });
+
+    // Voltage / current limits sent with every demand (same defaults as the Python app).
+    // The firmware latches them when a run starts, so a change only takes effect on the
+    // next start from standstill.
+    const limitHint = document.getElementById("limitHint");
+
+    function updateLimitHint() {
+        const dqLimitMv = (serial.maxV * 591) >> 10; // control_voltageLimitMV() in APP_control.c
+        const bemfRpm = Math.round(dqLimitMv / 3.8);   // iND057: 3.8 mV per rpm
+        limitHint.textContent = `dq ceiling ≈ ${(dqLimitMv / 1000).toFixed(1)} V (BEMF alone reaches it at ≈ ${bemfRpm} rpm)`;
+        limitHint.classList.toggle("warn", bemfRpm < 6500);
+    }
+
+    function bindLimit(input, prop, min, max) {
+        input.value = serial[prop];
+        input.addEventListener("change", () => {
+            const v = parseInt(input.value, 10);
+            if (!isNaN(v)) {
+                serial[prop] = Math.max(min, Math.min(max, v));
+            }
+            input.value = serial[prop];
+            updateLimitHint();
+        });
+    }
+
+    bindLimit(maxVInput, "maxV", 1000, 48000);
+    bindLimit(maxIInput, "maxI", 0, 30000);
+    updateLimitHint();
 
     // ---------------- 5. Canvas Slider Ticks ----------------
     function drawSliderTicks() {
@@ -307,31 +366,104 @@ document.addEventListener("DOMContentLoaded", () => {
         statusInputs.id.value = `${s.id} mA`;
         statusInputs.vq.value = `${s.vq} mV`;
         statusInputs.vd.value = `${s.vd} mV`;
+
+        // Magnitude of the dq voltage vector against the ceiling the firmware derives from
+        // Max V - when this sits at the limit the current loop has run out of voltage.
+        const vdq = Math.round(Math.hypot(s.vq, s.vd));
+        const dqLimit = (serial.maxV * 591) >> 10;
+        statusInputs.vdq.value = `${vdq} mV (limit ≈ ${dqLimit})`;
+        statusInputs.vdq.classList.toggle("warn", vdq > dqLimit * 0.95);
+
         statusInputs.pcbTemp.value = `${(s.pcbTemp / 1000).toFixed(1)} °C (${s.pcbTemp} m°C)`;
         statusInputs.motorTemp.value = `${(s.motorTemp / 1000).toFixed(1)} °C (${s.motorTemp} m°C)`;
         statusInputs.faultWord.value = `0x${s.faultWord.toString(16).padStart(8, '0').toUpperCase()}`;
+
+        statusAge.textContent = "live";
+        statusAge.classList.remove("stale");
     }
+
+    function resetStatusPanel(connected) {
+        Object.values(statusInputs).forEach(el => {
+            el.value = "-";
+            el.classList.remove("warn");
+        });
+        statusAge.classList.remove("stale");
+        statusAge.textContent = connected ? "waiting for status…" : "";
+    }
+
+    function handleStatusStale(stale, ageMs) {
+        if (stale) {
+            statusAge.textContent = `no status for ${Math.round(ageMs / 1000)} s - re-requesting`;
+            statusAge.classList.add("stale");
+        } else {
+            statusAge.textContent = "live";
+            statusAge.classList.remove("stale");
+        }
+    }
+
+    // Periodic telemetry (status / vector status / PID reports) arrives many times a second;
+    // logging each one buried everything else, so those only show when asked for.
+    const PERIODIC_MSG_IDS = new Set([
+        MotorProtocol.DIAG_MessageIdEnum.MSG_ID_STATUS,
+        MotorProtocol.DIAG_MessageIdEnum.MSG_ID_V_AC_STATUS,
+        MotorProtocol.DIAG_MessageIdEnum.MSG_ID_PID_REPORT
+    ]);
+
+    let lastBadStatusLog = 0;
 
     function handleParsedMessage(parsed) {
         rxStat.textContent = `RX: ${serial.rxCount} pkts (${serial.rxBytes} bytes)`;
 
+        const isStatus = parsed.msgId === MotorProtocol.DIAG_MessageIdEnum.MSG_ID_STATUS;
         let details = "";
         if (parsed.status) {
             updateStatusPanel(parsed.status);
             details = ` (Status: rpm=${parsed.status.rpm}, tick=${parsed.status.tickCount}, Vsup=${(parsed.status.supplyVoltage / 1000).toFixed(1)}V)`;
+        } else if (isStatus) {
+            // A status packet that can't be decoded used to vanish silently, leaving the
+            // panel blank - the usual cause is the firmware's status layout changing.
+            const now = performance.now();
+            if (now - lastBadStatusLog > 5000) {
+                lastBadStatusLog = now;
+                appendLog(`[WARN] MSG_ID_STATUS payload is ${parsed.payloadSize} bytes, expected >= 48 - status layout changed?\n`);
+            }
         }
 
-        appendLog(`[RX] ID=${parsed.msgIdName} Len=${parsed.payloadSize} Mode=${parsed.mode}${details}\n`);
+        if (chkLogRx.checked || !PERIODIC_MSG_IDS.has(parsed.msgId)) {
+            appendLog(`[RX] ID=${parsed.msgIdName} Len=${parsed.payloadSize} Mode=${parsed.mode}${details}\n`);
+        }
     }
 
-    let lastRawLogBytes = 0;
+    let hexDumpedBytes = 0;
+    const HEX_DUMP_LIMIT = 600;
+
     function handleRxBytes(totalBytes, chunkLen, chunkBytes) {
         rxStat.textContent = `RX: ${serial.rxCount} pkts (${totalBytes} bytes)`;
-        if (totalBytes - lastRawLogBytes >= 500) {
-            lastRawLogBytes = totalBytes;
-            appendLog(`[RX STREAM] ${totalBytes} raw bytes received so far...\n`);
+
+        // Raw capture for diagnosing a link that delivers bytes but no decodable frames.
+        if (chkHexDump.checked && chunkBytes && hexDumpedBytes < HEX_DUMP_LIMIT) {
+            const part = Array.from(chunkBytes.slice(0, HEX_DUMP_LIMIT - hexDumpedBytes));
+            hexDumpedBytes += part.length;
+            appendLog(`[HEX] ${part.map(b => b.toString(16).padStart(2, "0")).join(" ")}\n`);
         }
     }
+
+    chkHexDump.addEventListener("change", () => { hexDumpedBytes = 0; });
+
+    // Receive-side health, refreshed twice a second: shows whether bytes arrive at all,
+    // whether they frame and pass the CRC, and whether any of them are STATUS messages.
+    setInterval(() => {
+        if (!serial.isConnected()) {
+            rxDiag.textContent = "RX diagnostics: not connected";
+            return;
+        }
+        const d = serial.getRxDiagnostics();
+        const age = d.statusAgeMs === null ? "never" : `${(d.statusAgeMs / 1000).toFixed(1)} s ago`;
+        rxDiag.textContent =
+            `RX bytes ${d.rxBytes} | frames ${d.frames} | STATUS ${d.statusFrames} (last ${age}) | ` +
+            `CRC err ${d.crcErrors} | dropped ${d.droppedChars} | no-end ${d.noEnd} | no-start ${d.noStart} | ` +
+            `ids: ${d.ids.join(" ") || "-"}`;
+    }, 500);
 
     function handleProtocolError(errMsg) {
         appendLog(`[WARN] ${errMsg}\n`);
@@ -351,12 +483,27 @@ document.addEventListener("DOMContentLoaded", () => {
         txStat.textContent = `TX: ${count} pkts (Last: ${rpm} RPM)`;
     }
 
+    const LOG_MAX_CHARS = 60000;
+
     function appendLog(text) {
+        // Only follow the tail when the user hasn't scrolled up to read something.
+        const atBottom = logConsole.scrollHeight - logConsole.scrollTop - logConsole.clientHeight < 24;
         logConsole.textContent += text;
-        logConsole.scrollTop = logConsole.scrollHeight;
+        if (logConsole.textContent.length > LOG_MAX_CHARS) {
+            const trimmed = logConsole.textContent.slice(-LOG_MAX_CHARS / 2);
+            logConsole.textContent = trimmed.slice(trimmed.indexOf("\n") + 1);
+        }
+        if (atBottom) {
+            logConsole.scrollTop = logConsole.scrollHeight;
+        }
     }
 
     btnClearLog.addEventListener("click", () => {
         logConsole.textContent = "";
     });
+
+    appendLog(`WebMotorControl v${APP_VERSION} (${APP_CHANGELOG[0].date})\n`);
+    if (isFirefox) {
+        appendLog("[WARN] Firefox detected - Web Serial is not natively supported; use a Chromium-based browser.\n");
+    }
 });

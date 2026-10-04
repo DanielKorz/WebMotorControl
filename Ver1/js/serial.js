@@ -4,13 +4,14 @@
  */
 
 class WebSerialController {
-    constructor({ onMessage = null, onText = null, onConnectionChange = null, onTx = null, onRxBytes = null, onError = null } = {}) {
+    constructor({ onMessage = null, onText = null, onConnectionChange = null, onTx = null, onRxBytes = null, onError = null, onStatusStale = null } = {}) {
         this.onMessage = onMessage;
         this.onText = onText;
         this.onConnectionChange = onConnectionChange;
         this.onTx = onTx;
         this.onRxBytes = onRxBytes;
         this.onError = onError;
+        this.onStatusStale = onStatusStale;
 
         this.port = null;
         this.reader = null;
@@ -18,12 +19,33 @@ class WebSerialController {
 
         this.targetRpm = 0;
         this.maxRpm = 6000;
+        this.maxV = MotorProtocol.DEFAULT_MAX_V_MV;
+        this.maxI = MotorProtocol.DEFAULT_MAX_I_MA;
         this.periodicSend = true;
         this.sendIntervalMs = 200; // 5 Hz
+
+        // Slider drags fire an input event per step; cap what actually goes on the wire
+        // (the Python app likewise batches to one message per UI tick).
+        this.demandMinIntervalMs = 50;
+        this._lastDemandSent = 0;
+        this._demandTimer = null;
+
+        // Writes must never overlap: WritableStream.getWriter() throws while another
+        // writer is held, and that used to bubble up as a disconnect.
+        this._writeChain = Promise.resolve();
+
+        // Status watchdog. The firmware streams MSG_ID_STATUS every ~500 ms once diagnostic
+        // output is enabled; if it goes quiet, re-send the request and tell the UI.
+        this.statusTimeoutMs = 2000;
+        this.lastStatusTime = 0;
+        this.statusStale = false;
+        this._lastStatusRequest = 0;
 
         this.txCount = 0;
         this.rxCount = 0;
         this.rxBytes = 0;
+        this.msgCounts = {};      // received frame count per message id
+        this.lastStatusSeen = 0;
         this.timerId = null;
 
         this.dtrState = true;
@@ -33,7 +55,7 @@ class WebSerialController {
         this.parser = new MotorProtocol.ProtocolParser({
             msgCallback: (msgBytes) => this._handleParserMsg(msgBytes),
             textCallback: (textBytes) => this._handleParserText(textBytes),
-            debug: true
+            debug: false
         });
 
         // Pass parser errors to controller callback
@@ -102,7 +124,13 @@ class WebSerialController {
 
             this.connected = true;
             this.rxBytes = 0;
+            this.rxCount = 0;
+            this.msgCounts = {};
+            this.lastStatusSeen = 0;
             this.parser.reset();
+            this.lastStatusTime = performance.now();
+            this.statusStale = false;
+            this._writeChain = Promise.resolve();
 
             // 4. Start background stream reader loop
             this._startReaderLoop().catch(err => {
@@ -173,6 +201,11 @@ class WebSerialController {
             this.timerId = null;
         }
 
+        if (this._demandTimer) {
+            clearTimeout(this._demandTimer);
+            this._demandTimer = null;
+        }
+
         if (this.reader) {
             try {
                 await this.reader.cancel();
@@ -180,6 +213,13 @@ class WebSerialController {
                 // Ignore cancel errors on shutdown
             }
             this.reader = null;
+        }
+
+        // Let any in-flight write release its lock first - close() fails on a locked stream.
+        try {
+            await this._writeChain;
+        } catch (e) {
+            // already reported by the write itself
         }
 
         if (this.port) {
@@ -203,16 +243,39 @@ class WebSerialController {
     setTargetRpm(rpm, sendImmediately = true) {
         this.targetRpm = Math.max(0, Math.min(6000, Math.round(rpm)));
         if (sendImmediately && this.isConnected()) {
+            this._scheduleDemand();
+        }
+    }
+
+    /**
+     * Leading + trailing throttle: the first change goes out at once, then at most one
+     * message per demandMinIntervalMs, and the final value always gets sent. A stop
+     * (0 rpm) skips the wait.
+     */
+    _scheduleDemand() {
+        const wait = this._lastDemandSent + this.demandMinIntervalMs - performance.now();
+        if (wait <= 0 || this.targetRpm === 0) {
+            if (this._demandTimer) {
+                clearTimeout(this._demandTimer);
+                this._demandTimer = null;
+            }
             this.sendDemandNow();
+        } else if (!this._demandTimer) {
+            this._demandTimer = setTimeout(() => {
+                this._demandTimer = null;
+                this.sendDemandNow();
+            }, wait);
         }
     }
 
     async sendDemandNow() {
         if (!this.isConnected()) return;
-        const encoded = MotorProtocol.buildSpeedDemandMessage(this.targetRpm, this.maxRpm);
+        this._lastDemandSent = performance.now();
+        const rpm = this.targetRpm;
+        const encoded = MotorProtocol.buildSpeedDemandMessage(rpm, this.maxRpm, this.maxI, this.maxV);
         const ok = await this.sendBytes(encoded);
         if (ok && this.onTx) {
-            this.onTx(this.targetRpm, this.txCount);
+            this.onTx(rpm, this.txCount);
         }
     }
 
@@ -223,22 +286,44 @@ class WebSerialController {
         return await this.sendBytes(encoded);
     }
 
-    async sendBytes(data) {
-        if (!this.isConnected() || !this.port.writable) {
-            return false;
-        }
+    /**
+     * Queue a write. Writes are chained so only one writer is ever held on the stream;
+     * resolves true once the bytes were handed to the port.
+     */
+    sendBytes(data) {
+        const run = async () => {
+            if (!this.isConnected() || !this.port.writable) {
+                return false;
+            }
 
-        try {
-            const writer = this.port.writable.getWriter();
-            await writer.write(data);
-            writer.releaseLock();
-            this.txCount++;
-            return true;
-        } catch (err) {
-            console.error("Serial write error:", err);
-            await this.disconnect();
-            return false;
-        }
+            let writer = null;
+            try {
+                writer = this.port.writable.getWriter();
+                await writer.write(data);
+                this.txCount++;
+                return true;
+            } catch (err) {
+                console.error("Serial write error:", err);
+                if (this.onError) {
+                    this.onError(`[TX ERROR] ${err.name || 'WriteError'}: ${err.message || err}`);
+                }
+                // Only a lost device is fatal; any other failure just drops this one message.
+                if (err && (err.name === "NetworkError" || err.name === "InvalidStateError")) {
+                    this.disconnect();
+                }
+                return false;
+            } finally {
+                if (writer) {
+                    try {
+                        writer.releaseLock();
+                    } catch (e) { }
+                }
+            }
+        };
+
+        const result = this._writeChain.then(run, run);
+        this._writeChain = result.catch(() => false);
+        return result;
     }
 
     async requestStatus() {
@@ -289,15 +374,61 @@ class WebSerialController {
     _startPeriodicSender() {
         if (this.timerId) clearInterval(this.timerId);
         this.timerId = setInterval(() => {
-            if (this.connected && this.periodicSend) {
+            if (!this.connected) return;
+            if (this.periodicSend) {
                 this.sendDemandNow();
             }
+            this._checkStatusWatchdog();
         }, this.sendIntervalMs);
+    }
+
+    _checkStatusWatchdog() {
+        const now = performance.now();
+        const age = now - this.lastStatusTime;
+        if (age <= this.statusTimeoutMs) return;
+
+        this.statusStale = true;
+        if (this.onStatusStale) this.onStatusStale(true, age);
+
+        // The status stream only runs once the MCU has seen a MSG_ID_STATUS request.
+        if (now - this._lastStatusRequest > this.statusTimeoutMs) {
+            this._lastStatusRequest = now;
+            this.requestStatus();
+        }
+    }
+
+    /** Snapshot of receive-side health, for the on-screen RX diagnostics line. */
+    getRxDiagnostics() {
+        const p = this.parser;
+        return {
+            rxBytes: this.rxBytes,
+            frames: this.rxCount,
+            statusFrames: this.msgCounts[MotorProtocol.DIAG_MessageIdEnum.MSG_ID_STATUS] || 0,
+            crcErrors: p.crcErrors,
+            droppedChars: p.droppedChars,
+            noEnd: p.errNoEnd,
+            noStart: p.errNoStart,
+            ids: Object.entries(this.msgCounts).map(([id, n]) => `${MotorProtocol.getMessageIdName(Number(id))}x${n}`),
+            statusAgeMs: this.lastStatusSeen ? performance.now() - this.lastStatusSeen : null
+        };
     }
 
     _handleParserMsg(rawBytes) {
         this.rxCount++;
         const parsed = MotorProtocol.unpackMessage(rawBytes);
+        if (parsed) {
+            this.msgCounts[parsed.msgId] = (this.msgCounts[parsed.msgId] || 0) + 1;
+            if (parsed.msgId === MotorProtocol.DIAG_MessageIdEnum.MSG_ID_STATUS) {
+                this.lastStatusSeen = performance.now();
+            }
+        }
+        if (parsed && parsed.msgId === MotorProtocol.DIAG_MessageIdEnum.MSG_ID_STATUS) {
+            this.lastStatusTime = performance.now();
+            if (this.statusStale) {
+                this.statusStale = false;
+                if (this.onStatusStale) this.onStatusStale(false, 0);
+            }
+        }
         if (parsed && this.onMessage) {
             this.onMessage(parsed);
         }

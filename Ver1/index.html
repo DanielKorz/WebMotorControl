@@ -17,7 +17,7 @@
         <!-- 1. Connection & Port Configuration Card -->
         <div class="card">
             <div class="conn-header">
-                <span class="app-title">⚡ Motor Speed Controller</span>
+                <span class="app-title">⚡ Motor Speed Controller <span id="appVersion" class="app-version" title="Web app version"></span></span>
                 <div id="statusBadge" class="status-badge disconnected">
                     <span class="status-dot"></span>
                     <span id="statusText">Disconnected</span>
@@ -125,11 +125,24 @@
                     <button class="btn btn-secondary btn-sm" data-rpm="6000">6000</button>
                 </div>
 
+                <!-- Limits sent with every demand (latched by firmware at run start) -->
+                <div class="options-row limits-row">
+                    <label for="maxVInput" class="form-label">Max V (mV):</label>
+                    <input id="maxVInput" type="number" min="1000" max="48000" step="1000" class="text-input" style="width: 90px;">
+                    <label for="maxIInput" class="form-label">Max I (mA):</label>
+                    <input id="maxIInput" type="number" min="0" max="30000" step="1000" class="text-input" style="width: 90px;">
+                    <span id="limitHint" class="limit-hint"></span>
+                </div>
+
                 <!-- Keep-alive & Diagnostics Operations -->
                 <div class="options-row">
                     <label class="chk-group">
                         <input id="chkPeriodic" type="checkbox" checked>
                         <span>Keep alive (5 Hz)</span>
+                    </label>
+                    <label class="chk-group">
+                        <input id="chkLogRx" type="checkbox">
+                        <span>Log periodic RX</span>
                     </label>
                     <div class="action-buttons">
                         <button id="btnReqStatus" class="btn btn-secondary btn-sm" title="Send MSG_ID_STATUS request to trigger telemetry stream">Request Status</button>
@@ -143,6 +156,7 @@
             <div class="card">
                 <div class="card-title">
                     <span>Status Panel (CDataStatus)</span>
+                    <span id="statusAge" class="status-age"></span>
                 </div>
                 <div class="status-grid">
                     <!-- Column 1 -->
@@ -200,6 +214,10 @@
                             <input id="stat_vd" type="text" readonly value="-">
                         </div>
                         <div class="status-field">
+                            <label>|vdq|:</label>
+                            <input id="stat_vdq" type="text" readonly value="-">
+                        </div>
+                        <div class="status-field">
                             <label>pcbTemp:</label>
                             <input id="stat_pcbTemp" type="text" readonly value="-">
                         </div>
@@ -226,12 +244,20 @@
                 </div>
                 <button id="btnClearLog" class="btn btn-secondary btn-sm">Clear Log</button>
             </div>
+            <div class="rx-diag-row">
+                <span id="rxDiag" class="rx-diag">RX diagnostics: not connected</span>
+                <label class="chk-group">
+                    <input id="chkHexDump" type="checkbox">
+                    <span>Hex dump raw RX (first 600 bytes)</span>
+                </label>
+            </div>
             <div id="logConsole" class="log-console"></div>
         </div>
 
     </div>
 
     <!-- Scripts -->
+    <script src="js/version.js"></script>
     <script src="js/protocol.js"></script>
     <script src="js/serial.js"></script>
     <script src="js/app.js"></script>

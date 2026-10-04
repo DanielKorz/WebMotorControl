@@ -242,11 +242,18 @@ function encodeMessage(message) {
     return new Uint8Array(out);
 }
 
+/* Defaults match the MotorCtrl Python app's slider defaults (motor_control.ui). The
+ * firmware turns maxV into the dq-vector ceiling (maxV * 591/1024) and latches it at
+ * start, so a low value here starves the current loop once BEMF (3.8 V per 1000 rpm)
+ * approaches it - sending 10 V made the motor run rough around 1000 rpm. */
+const DEFAULT_MAX_V_MV = 48000;
+const DEFAULT_MAX_I_MA = 30000;   // firmware clamps this to config.maxCurrentLimit_mA
+
 /**
  * Build framed speed demand message:
  * Format: '<BBB iiiii B' (24 bytes payload)
  */
-function buildSpeedDemandMessage(rpm, maxRpm = 6000, maxI = 10000, maxV = 10000, motionCtrl = 0, torqueType = 3, modulation = 1) {
+function buildSpeedDemandMessage(rpm, maxRpm = 6000, maxI = DEFAULT_MAX_I_MA, maxV = DEFAULT_MAX_V_MV, motionCtrl = 0, torqueType = 3, modulation = 1) {
     const payload = new Uint8Array(24);
     const view = new DataView(payload.buffer);
 
@@ -398,6 +405,8 @@ function unpackMessage(rawMsg) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         DLE, SOM, EOM,
+        DEFAULT_MAX_V_MV,
+        DEFAULT_MAX_I_MA,
         MSG_MODE,
         DIAG_MessageIdEnum,
         DIAG_RequestIdEnum,
@@ -415,6 +424,8 @@ if (typeof module !== 'undefined' && module.exports) {
 } else {
     window.MotorProtocol = {
         DLE, SOM, EOM,
+        DEFAULT_MAX_V_MV,
+        DEFAULT_MAX_I_MA,
         MSG_MODE,
         DIAG_MessageIdEnum,
         DIAG_RequestIdEnum,

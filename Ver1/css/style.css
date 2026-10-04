@@ -365,3 +365,59 @@ body {
     white-space: pre-wrap;
     word-break: break-all;
 }
+
+/* Voltage / current limits row and status liveness */
+.limits-row {
+    justify-content: flex-start;
+    margin-bottom: 6px;
+}
+
+.limit-hint {
+    font-size: 11px;
+    color: #606266;
+}
+
+.limit-hint.warn {
+    color: #b45309;
+    font-weight: 600;
+}
+
+.status-age {
+    font-size: 11px;
+    font-weight: 400;
+    color: #67c23a;
+}
+
+.status-age.stale {
+    color: #f56c6c;
+    font-weight: 600;
+}
+
+.status-field input.warn {
+    background-color: #fef3c7;
+    border-color: #f59e0b;
+    color: #92400e;
+}
+
+.app-version {
+    font-size: 11px;
+    font-weight: 400;
+    color: #909399;
+    margin-left: 6px;
+    cursor: help;
+}
+
+.rx-diag-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 6px 0;
+}
+
+.rx-diag {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 11px;
+    color: #475569;
+}
