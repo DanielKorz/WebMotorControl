@@ -25,14 +25,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const maxVInput = document.getElementById("maxVInput");
     const maxIInput = document.getElementById("maxIInput");
-    const chkLogRx = document.getElementById("chkLogRx");
     const statusAge = document.getElementById("statusAge");
     const rxDiag = document.getElementById("rxDiag");
-    const chkHexDump = document.getElementById("chkHexDump");
 
     const chkPeriodic = document.getElementById("chkPeriodic");
     const btnReqStatus = document.getElementById("btnReqStatus");
     const btnFindZero = document.getElementById("btnFindZero");
+    const btnSelfTest = document.getElementById("btnSelfTest");
     const btnClearFaults = document.getElementById("btnClearFaults");
 
     const txStat = document.getElementById("txStat");
@@ -130,6 +129,32 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // ---------------- Theme ----------------
+    // "default" is the original look; "python" follows the Python app's colours; "retro" is an
+    // 80s green-phosphor terminal and "fresh" a modern dark glass UI (all in style.css).
+    const THEME_BUTTONS = {
+        default: document.getElementById("themeDefault"),
+        python: document.getElementById("themePython"),
+        retro: document.getElementById("themeRetro"),
+        fresh: document.getElementById("themeFresh")
+    };
+
+    function applyTheme(name, save = true) {
+        if (!(name in THEME_BUTTONS)) name = "default";
+        if (name === "default") {
+            document.documentElement.removeAttribute("data-theme");
+        } else {
+            document.documentElement.setAttribute("data-theme", name);
+        }
+        Object.entries(THEME_BUTTONS).forEach(([key, btn]) => btn.setAttribute("aria-pressed", String(key === name)));
+        if (save) {
+            if (window.ThemeStore) window.ThemeStore.set(name); // localStorage + cookie, see index.html
+        }
+        drawSliderTicks(); // the tick marks are canvas-drawn, so they need the new colours
+    }
+
+    Object.entries(THEME_BUTTONS).forEach(([key, btn]) => btn.addEventListener("click", () => applyTheme(key)));
+
     // ---------------- Version ----------------
     const appVersionEl = document.getElementById("appVersion");
     appVersionEl.textContent = `v${APP_VERSION}`;
@@ -148,6 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
             chkDtr.checked = serial.dtrState;
             chkRts.checked = serial.rtsState;
             resetStatusPanel(true);
+            focChart.clear();
             appendLog(`--- ${message} (web app v${APP_VERSION}) ---\n`);
         } else {
             resetStatusPanel(false);
@@ -255,6 +281,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const margin = 8;
         const span = w - 2 * margin;
 
+        const css = getComputedStyle(document.documentElement);
+        const tickMajor = css.getPropertyValue("--tick-major").trim() || "#4a5568";
+        const tickMinor = css.getPropertyValue("--tick-minor").trim() || "#a0aec0";
+        const tickText = css.getPropertyValue("--tick-text").trim() || "#2d3748";
+
         // Minor ticks every 500 RPM
         for (let rpm = 0; rpm <= 6000; rpm += 500) {
             const x = margin + (rpm / 6000) * span;
@@ -263,7 +294,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.beginPath();
             ctx.moveTo(x, 0);
             ctx.lineTo(x, isMajor ? 6 : 3);
-            ctx.strokeStyle = isMajor ? "#4a5568" : "#a0aec0";
+            ctx.strokeStyle = isMajor ? tickMajor : tickMinor;
             ctx.lineWidth = 1;
             ctx.stroke();
         }
@@ -280,7 +311,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ];
 
         ctx.font = "10px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillStyle = "#2d3748";
+        ctx.fillStyle = tickText;
 
         ticks.forEach(({ rpm, text, align }) => {
             const x = margin + (rpm / 6000) * span;
@@ -307,6 +338,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // Initial draw after layout
     setTimeout(drawSliderTicks, 50);
 
+    applyTheme(document.documentElement.getAttribute("data-theme") || "default", false);
+
     // ---------------- 6. Diagnostic Operations ----------------
     btnFindZero.addEventListener("click", async () => {
         if (!serial.isConnected()) {
@@ -316,6 +349,19 @@ document.addEventListener("DOMContentLoaded", () => {
         const ok = await serial.SendDiagRequest(MotorProtocol.DIAG_RequestIdEnum.DIAG_REQ_CAL_FIND_INDEX);
         if (ok) {
             appendLog(">>> Sent DIAG_REQ_CAL_FIND_INDEX (Find Zero Index)\n");
+        }
+    });
+
+    // Same request as the Python app's Self-Test button. The firmware only starts it from idle;
+    // progress and the PASSED / FAILED result arrive as diagnostic events in the log.
+    btnSelfTest.addEventListener("click", async () => {
+        if (!serial.isConnected()) {
+            alert("Connect to the controller before running the self-test.");
+            return;
+        }
+        const ok = await serial.SendDiagRequest(MotorProtocol.DIAG_RequestIdEnum.DIAG_REQ_SELFTEST);
+        if (ok) {
+            appendLog(">>> Sent DIAG_REQ_SELFTEST (Self-Test)\n");
         }
     });
 
@@ -354,12 +400,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const timeStr = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 
         statusInputs.tickCount.value = `${s.tickCount} (${timeStr})`;
-        statusInputs.version.value = `${(s.version / 100).toFixed(2)} (${s.version})`;
+        statusInputs.version.value = `${(s.version / 100).toFixed(2)}`;
         statusInputs.rpm.value = `${s.rpm} RPM`;
         statusInputs.encoderValue.value = `${s.encoderValue}`;
-        statusInputs.supplyVoltage.value = `${(s.supplyVoltage / 1000).toFixed(2)} V (${s.supplyVoltage} mV)`;
+        statusInputs.supplyVoltage.value = `${(s.supplyVoltage / 1000).toFixed(2)} V`;
         statusInputs.bemfVoltage.value = `${(s.bemfVoltage / 1000).toFixed(2)} V (${s.bemfVoltage} mV)`;
-        statusInputs.torque_mNm.value = `${(s.torque_mNm / 1000).toFixed(2)} Nm (${s.torque_mNm} mNm)`;
+        statusInputs.torque_mNm.value = `${(s.torque_mNm / 1000).toFixed(3)} Nm`;
         statusInputs.statusWord.value = `0x${s.statusWord.toString(16).padStart(8, '0').toUpperCase()}`;
 
         statusInputs.iq.value = `${s.iq} mA`;
@@ -374,15 +420,75 @@ document.addEventListener("DOMContentLoaded", () => {
         statusInputs.vdq.value = `${vdq} mV (limit ≈ ${dqLimit})`;
         statusInputs.vdq.classList.toggle("warn", vdq > dqLimit * 0.95);
 
-        statusInputs.pcbTemp.value = `${(s.pcbTemp / 1000).toFixed(1)} °C (${s.pcbTemp} m°C)`;
-        statusInputs.motorTemp.value = `${(s.motorTemp / 1000).toFixed(1)} °C (${s.motorTemp} m°C)`;
+        statusInputs.pcbTemp.value = `${(s.pcbTemp / 1000).toFixed(1)} °C`;
+        statusInputs.motorTemp.value = `${(s.motorTemp / 1000).toFixed(1)} °C`;
         statusInputs.faultWord.value = `0x${s.faultWord.toString(16).padStart(8, '0').toUpperCase()}`;
+
+        updateFaultPanel(s.statusWord);
 
         statusAge.textContent = "live";
         statusAge.classList.remove("stale");
     }
 
+    // ---------------- Faults & warnings panel ----------------
+    // Bit layout of the status word (CTRL_STATE in the firmware's APP_faults.h):
+    // bits 16-23 warnings, bits 24-31 faults.
+    const FAULT_BITS = [
+        { el: "flt_oc",    bit: 24, kind: "FAULT",   name: "OVERCURRENT" },
+        { el: "flt_ot",    bit: 25, kind: "FAULT",   name: "OVERTEMPERATURE" },
+        { el: "flt_stall", bit: 26, kind: "FAULT",   name: "STALL" },
+        { el: "flt_self",  bit: 27, kind: "FAULT",   name: "SELF_TEST" },
+        { el: "flt_uv",    bit: 28, kind: "FAULT",   name: "UNDERVOLTAGE" },
+        { el: "flt_sm",    bit: 29, kind: "FAULT",   name: "SUPPLY_MISMATCH" },
+        { el: "warn_ht",   bit: 16, kind: "WARNING", name: "TEMP_HIGH" },
+        { el: "warn_sm",   bit: 17, kind: "WARNING", name: "SUPPLY_MISMATCH" }
+    ].map(f => ({ ...f, node: document.getElementById(f.el) }));
+
+    let prevStatusWord = null;
+
+    function updateFaultPanel(word) {
+        for (const f of FAULT_BITS) {
+            const active = ((word >>> f.bit) & 1) === 1;
+            f.node.classList.toggle("active", active);
+
+            // Log changes, like the Python app. On the first status after connecting only
+            // conditions that are already active are reported.
+            const was = prevStatusWord === null ? false : (((prevStatusWord >>> f.bit) & 1) === 1);
+            if (active && !was) {
+                appendLog(`${f.kind}: ${f.name}`, f.kind === "FAULT" ? "error" : "warning");
+            } else if (!active && was) {
+                appendLog(`${f.kind}: ${f.name} cleared`);
+            }
+        }
+        prevStatusWord = word;
+    }
+
+    function resetFaultPanel() {
+        prevStatusWord = null;
+        FAULT_BITS.forEach(f => f.node.classList.remove("active"));
+    }
+
+    // Diagnostic request buttons of the panel, same requests as the Python app sends.
+    function bindRequestButton(id, request, args, label) {
+        document.getElementById(id).addEventListener("click", async () => {
+            if (!serial.isConnected()) {
+                alert("Connect to the controller first.");
+                return;
+            }
+            const ok = await serial.SendDiagRequest(MotorProtocol.DIAG_RequestIdEnum[request], ...(args()));
+            if (ok) {
+                appendLog(`>>> Sent ${request} (${label})\n`);
+            }
+        });
+    }
+
+    const SOUND_AMPLITUDE = 40;
+    bindRequestButton("btnSoundTest", "DIAG_REQ_BEEP", () => [3000, 600, SOUND_AMPLITUDE], "Beep 3000 Hz, 600 ms");
+    bindRequestButton("btnSoundPlay", "DIAG_REQ_SOUND_PATTERN",
+        () => [parseInt(document.getElementById("soundPattern").value, 10), SOUND_AMPLITUDE], "Sound pattern");
+
     function resetStatusPanel(connected) {
+        resetFaultPanel();
         Object.values(statusInputs).forEach(el => {
             el.value = "-";
             el.classList.remove("warn");
@@ -401,24 +507,81 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Periodic telemetry (status / vector status / PID reports) arrives many times a second;
-    // logging each one buried everything else, so those only show when asked for.
-    const PERIODIC_MSG_IDS = new Set([
-        MotorProtocol.DIAG_MessageIdEnum.MSG_ID_STATUS,
-        MotorProtocol.DIAG_MessageIdEnum.MSG_ID_V_AC_STATUS,
-        MotorProtocol.DIAG_MessageIdEnum.MSG_ID_PID_REPORT
-    ]);
+    // ---------------- Live FOC chart (Id / Iq in mA, Ud / Uq in V) ----------------
+    const focChart = new FocChart(document.getElementById("focChart"), { windowSec: 5 });
+    const legendEls = {
+        id: document.getElementById("lg_id"),
+        iq: document.getElementById("lg_iq"),
+        vd: document.getElementById("lg_vd"),
+        vq: document.getElementById("lg_vq")
+    };
+
+    // mV -> V with two decimals, without a "-0.00" for tiny negative values.
+    function formatVolts(mv) {
+        const text = (mv / 1000).toFixed(2);
+        return text === "-0.00" ? "0.00" : text;
+    }
+
+    let lastLegendUpdate = 0;
+    function updateChartLegend(v) {
+        const now = performance.now();
+        if (now - lastLegendUpdate < 100) return; // 10 Hz is plenty for numbers
+        lastLegendUpdate = now;
+        legendEls.id.textContent = `${v.id} mA`;
+        legendEls.iq.textContent = `${v.iq} mA`;
+        legendEls.vd.textContent = `${formatVolts(v.vd)} V`;
+        legendEls.vq.textContent = `${formatVolts(v.vq)} V`;
+    }
+
+    document.getElementById("chartWindow").addEventListener("change", (e) => {
+        focChart.setWindow(parseInt(e.target.value, 10));
+    });
+
+    const btnChartPause = document.getElementById("btnChartPause");
+    btnChartPause.addEventListener("click", () => {
+        focChart.setPaused(!focChart.paused);
+        btnChartPause.textContent = focChart.paused ? "Resume" : "Pause";
+    });
+
+    document.getElementById("btnChartClear").addEventListener("click", () => focChart.clear());
+
+    document.querySelectorAll(".chart-legend input[data-series]").forEach((cb) => {
+        cb.addEventListener("change", () => focChart.setVisible(cb.dataset.series, cb.checked));
+    });
+
+    // Diagnostic events from the firmware (MSG_ID_DIAG_INFO), decoded as in the Python app's
+    // DiagCodeParser. The prefix is the firmware tick in seconds and the sequence number.
+    function logDiagInfo(info) {
+        const d = DiagCodes.describeDiagInfo(info);
+        if (d.powerUp) {
+            appendLog("-----------------------------------------------------------------", "power_up");
+        }
+        const prefix = `[${(info.tick / 1000).toFixed(3)}] ${info.seq.toString(16).padStart(2, "0")} `;
+        appendLog(d.text, d.style, prefix);
+    }
 
     let lastBadStatusLog = 0;
 
+    // Received messages are not echoed to the log; the RX diagnostics line carries the
+    // per-message-id counts. Only STATUS drives the UI, and a STATUS that cannot be
+    // decoded is reported.
     function handleParsedMessage(parsed) {
         rxStat.textContent = `RX: ${serial.rxCount} pkts (${serial.rxBytes} bytes)`;
 
+        if (parsed.vac) {
+            focChart.addSample(parsed.vac);
+            updateChartLegend(parsed.vac);
+        }
+
+        if (parsed.diag) {
+            logDiagInfo(parsed.diag);
+        } else if (parsed.msgId === MotorProtocol.DIAG_MessageIdEnum.MSG_ID_DIAG_INFO) {
+            appendLog(`[WARN] MSG_ID_DIAG_INFO payload is ${parsed.payloadSize} bytes, expected 25\n`, "warning");
+        }
+
         const isStatus = parsed.msgId === MotorProtocol.DIAG_MessageIdEnum.MSG_ID_STATUS;
-        let details = "";
         if (parsed.status) {
             updateStatusPanel(parsed.status);
-            details = ` (Status: rpm=${parsed.status.rpm}, tick=${parsed.status.tickCount}, Vsup=${(parsed.status.supplyVoltage / 1000).toFixed(1)}V)`;
         } else if (isStatus) {
             // A status packet that can't be decoded used to vanish silently, leaving the
             // panel blank - the usual cause is the firmware's status layout changing.
@@ -428,27 +591,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 appendLog(`[WARN] MSG_ID_STATUS payload is ${parsed.payloadSize} bytes, expected >= 48 - status layout changed?\n`);
             }
         }
-
-        if (chkLogRx.checked || !PERIODIC_MSG_IDS.has(parsed.msgId)) {
-            appendLog(`[RX] ID=${parsed.msgIdName} Len=${parsed.payloadSize} Mode=${parsed.mode}${details}\n`);
-        }
     }
 
-    let hexDumpedBytes = 0;
-    const HEX_DUMP_LIMIT = 600;
-
-    function handleRxBytes(totalBytes, chunkLen, chunkBytes) {
+    function handleRxBytes(totalBytes) {
         rxStat.textContent = `RX: ${serial.rxCount} pkts (${totalBytes} bytes)`;
-
-        // Raw capture for diagnosing a link that delivers bytes but no decodable frames.
-        if (chkHexDump.checked && chunkBytes && hexDumpedBytes < HEX_DUMP_LIMIT) {
-            const part = Array.from(chunkBytes.slice(0, HEX_DUMP_LIMIT - hexDumpedBytes));
-            hexDumpedBytes += part.length;
-            appendLog(`[HEX] ${part.map(b => b.toString(16).padStart(2, "0")).join(" ")}\n`);
-        }
     }
-
-    chkHexDump.addEventListener("change", () => { hexDumpedBytes = 0; });
 
     // Receive-side health, refreshed twice a second: shows whether bytes arrive at all,
     // whether they frame and pass the CRC, and whether any of them are STATUS messages.
@@ -461,8 +608,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const age = d.statusAgeMs === null ? "never" : `${(d.statusAgeMs / 1000).toFixed(1)} s ago`;
         rxDiag.textContent =
             `RX bytes ${d.rxBytes} | frames ${d.frames} | STATUS ${d.statusFrames} (last ${age}) | ` +
-            `CRC err ${d.crcErrors} | dropped ${d.droppedChars} | no-end ${d.noEnd} | no-start ${d.noStart} | ` +
-            `ids: ${d.ids.join(" ") || "-"}`;
+            `CRC err ${d.crcErrors} | dropped ${d.droppedChars} | no-end ${d.noEnd} | no-start ${d.noStart}`;
     }, 500);
 
     function handleProtocolError(errMsg) {
@@ -484,14 +630,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const LOG_MAX_CHARS = 60000;
+    let logChars = 0;
 
-    function appendLog(text) {
+    /**
+     * Append one line to the log. `cls` is an optional style name (error, warning, prc, ...)
+     * that maps to a .log-<cls> class; `prefix` is dimmed text shown before the line.
+     */
+    function appendLog(text, cls = null, prefix = "") {
         // Only follow the tail when the user hasn't scrolled up to read something.
         const atBottom = logConsole.scrollHeight - logConsole.scrollTop - logConsole.clientHeight < 24;
-        logConsole.textContent += text;
-        if (logConsole.textContent.length > LOG_MAX_CHARS) {
-            const trimmed = logConsole.textContent.slice(-LOG_MAX_CHARS / 2);
-            logConsole.textContent = trimmed.slice(trimmed.indexOf("\n") + 1);
+
+        const line = document.createElement("span");
+        if (cls) line.className = `log-${cls}`;
+        if (prefix) {
+            const pre = document.createElement("span");
+            pre.className = "log-seq";
+            pre.textContent = prefix;
+            line.appendChild(pre);
+        }
+        line.appendChild(document.createTextNode(text.replace(/\n$/, "")));
+        logConsole.appendChild(line);
+        logChars += text.length + prefix.length;
+
+        if (logChars > LOG_MAX_CHARS) {
+            while (logConsole.firstChild && logChars > LOG_MAX_CHARS / 2) {
+                logChars -= logConsole.firstChild.textContent.length;
+                logConsole.removeChild(logConsole.firstChild);
+            }
         }
         if (atBottom) {
             logConsole.scrollTop = logConsole.scrollHeight;
@@ -500,6 +665,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     btnClearLog.addEventListener("click", () => {
         logConsole.textContent = "";
+        logChars = 0;
     });
 
     appendLog(`WebMotorControl v${APP_VERSION} (${APP_CHANGELOG[0].date})\n`);

@@ -5,6 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Motor Speed Controller - WebSerial</title>
     <link rel="stylesheet" href="css/style.css">
+    <script>
+        // Theme persistence. The choice is kept in localStorage and, as a backup for browsers
+        // that block or clear site storage, in a one-year cookie scoped to this app's folder.
+        // Both are read here, before first paint, so the page never flashes the wrong theme.
+        (function () {
+            var KEY = "motorctrl.theme";
+            var THEMES = ["python", "retro", "fresh"];
+            var path = location.pathname.replace(/[^\/]*$/, "") || "/";
+
+            function readCookie() {
+                var m = document.cookie.match(new RegExp("(?:^|; )" + KEY.replace(".", "\\.") + "=([^;]*)"));
+                return m ? decodeURIComponent(m[1]) : null;
+            }
+
+            window.ThemeStore = {
+                get: function () {
+                    var value = null;
+                    try { value = localStorage.getItem(KEY) || localStorage.getItem("theme"); } catch (e) { }
+                    return value || readCookie();
+                },
+                set: function (name) {
+                    try { localStorage.setItem(KEY, name); } catch (e) { }
+                    try {
+                        document.cookie = KEY + "=" + encodeURIComponent(name) + "; max-age=31536000; path=" + path +
+                            "; SameSite=Lax" + (location.protocol === "https:" ? "; Secure" : "");
+                    } catch (e) { }
+                }
+            };
+
+            var saved = window.ThemeStore.get();
+            if (THEMES.indexOf(saved) !== -1) document.documentElement.setAttribute("data-theme", saved);
+        })();
+    </script>
 </head>
 <body>
     <div class="app-container">
@@ -18,6 +51,12 @@
         <div class="card">
             <div class="conn-header">
                 <span class="app-title">⚡ Motor Speed Controller <span id="appVersion" class="app-version" title="Web app version"></span></span>
+                <div class="theme-switch" role="group" aria-label="Theme">
+                    <button id="themeDefault" class="theme-btn theme-default" type="button" title="Current theme" aria-label="Current theme"></button>
+                    <button id="themePython" class="theme-btn theme-python" type="button" title="Match the Python app theme" aria-label="Python app theme"></button>
+                    <button id="themeRetro" class="theme-btn theme-retro" type="button" title="Retro 80s terminal theme" aria-label="Retro 80s terminal theme"></button>
+                    <button id="themeFresh" class="theme-btn theme-fresh" type="button" title="Fresh modern dark theme" aria-label="Fresh modern dark theme"></button>
+                </div>
                 <div id="statusBadge" class="status-badge disconnected">
                     <span class="status-dot"></span>
                     <span id="statusText">Disconnected</span>
@@ -87,6 +126,16 @@
                     </div>
                 </div>
             </div>
+
+            <div class="conn-stats">
+                <div class="conn-stats-counters">
+                    <span id="txStat">TX: 0 pkts</span>
+                    <span id="rxStat">RX: 0 pkts (0 bytes)</span>
+                </div>
+                <div class="rx-diag-row">
+                    <span id="rxDiag" class="rx-diag">RX diagnostics: not connected</span>
+                </div>
+            </div>
         </div>
 
         <!-- 2. Middle Section: Speed Demand Controls & Status Panel -->
@@ -140,14 +189,10 @@
                         <input id="chkPeriodic" type="checkbox" checked>
                         <span>Keep alive (5 Hz)</span>
                     </label>
-                    <label class="chk-group">
-                        <input id="chkLogRx" type="checkbox">
-                        <span>Log periodic RX</span>
-                    </label>
                     <div class="action-buttons">
-                        <button id="btnReqStatus" class="btn btn-secondary btn-sm" title="Send MSG_ID_STATUS request to trigger telemetry stream">Request Status</button>
-                        <button id="btnFindZero" class="btn btn-secondary btn-sm">Find Zero Index</button>
-                        <button id="btnClearFaults" class="btn btn-secondary btn-sm">Clear Faults</button>
+                        <button id="btnReqStatus" class="btn btn-secondary btn-sm" disabled title="Disabled - status is requested automatically on connect and re-requested if it stops">Request Status</button>
+                        <button id="btnFindZero" class="btn btn-secondary btn-sm" disabled title="Disabled">Find Zero Index</button>
+                        <button id="btnSelfTest" class="btn btn-secondary btn-sm" title="Run the controller self-test (DIAG_REQ_SELFTEST); only starts while the controller is idle">Self-Test</button>
                     </div>
                 </div>
             </div>
@@ -235,23 +280,94 @@
 
         </div>
 
-        <!-- 3. Telemetry & Log Console -->
-        <div class="card">
-            <div class="log-stats-bar">
-                <div class="log-stats-left">
-                    <span id="txStat">TX: 0 pkts</span>
-                    <span id="rxStat">RX: 0 pkts (0 bytes)</span>
+        <!-- 2C. Faults & Warnings (left) and Sounds (right), as in the Python app -->
+        <div class="middle-grid">
+
+            <div class="card faults-card">
+                <div class="card-title">
+                    <span>Faults &amp; Warnings</span>
                 </div>
-                <button id="btnClearLog" class="btn btn-secondary btn-sm">Clear Log</button>
+                <div class="faults-row">
+                    <div class="fault-group" aria-label="Faults">
+                        <span id="flt_oc"    class="fault-chip fault" title="Overcurrent fault">OC</span>
+                        <span id="flt_ot"    class="fault-chip fault" title="Overtemperature fault">OT</span>
+                        <span id="flt_self"  class="fault-chip fault" title="Self-test fault">SELF</span>
+                        <span id="flt_stall" class="fault-chip fault" title="Motor stall detected fault">STALL</span>
+                        <span id="flt_uv"    class="fault-chip fault" title="Undervoltage">UV</span>
+                        <span id="flt_sm"    class="fault-chip fault" title="Supply mismatch">SM</span>
+                    </div>
+                    <div class="fault-group" aria-label="Warnings">
+                        <span id="warn_ht"   class="fault-chip warning" title="High temperature warning">HTW</span>
+                        <span id="warn_sm"   class="fault-chip warning" title="Supply mismatch warning">SMW</span>
+                    </div>
+                    <button id="btnClearFaults" class="btn btn-secondary btn-sm">Clear Faults</button>
+                </div>
             </div>
-            <div class="rx-diag-row">
-                <span id="rxDiag" class="rx-diag">RX diagnostics: not connected</span>
-                <label class="chk-group">
-                    <input id="chkHexDump" type="checkbox">
-                    <span>Hex dump raw RX (first 600 bytes)</span>
-                </label>
+
+            <div class="card sounds-card">
+                <div class="card-title">
+                    <span>Sounds</span>
+                    <span class="card-hint">played through the motor windings - motor must be stopped</span>
+                </div>
+                <div class="faults-row">
+                    <div class="fault-group">
+                        <button id="btnSoundTest" class="btn btn-secondary btn-sm" title="Play a 3 kHz, 600 ms beep">Beep</button>
+                    </div>
+                    <div class="fault-group">
+                        <select id="soundPattern" class="select-input" title="Sound pattern">
+                            <option value="1">Single Confirm Beep</option>
+                            <option value="2">Ascending Two-Tone</option>
+                            <option value="3">Descending Two-Tone</option>
+                            <option value="4">Error Alarm</option>
+                            <option value="5">Warning Chirp</option>
+                            <option value="6">Success Fanfare</option>
+                            <option value="7">Major Triad Arpeggio</option>
+                            <option value="8">Alternating Siren Alert</option>
+                            <option value="9">Calibration Chime</option>
+                            <option value="10">Low Alert Buzz</option>
+                        </select>
+                        <button id="btnSoundPlay" class="btn btn-secondary btn-sm">Play</button>
+                    </div>
+                </div>
             </div>
-            <div id="logConsole" class="log-console"></div>
+
+        </div>
+
+        <!-- 3. Live chart (left) and Telemetry & Log Console (right) -->
+        <div class="lower-grid">
+
+            <div class="card chart-card">
+                <div class="card-title">
+                    <span>FOC Graph - Rotating frame</span>
+                    <span class="chart-controls">
+                        <label class="form-label" for="chartWindow">Window:</label>
+                        <select id="chartWindow" class="select-input">
+                            <option value="5" selected>5 s</option>
+                            <option value="10">10 s</option>
+                            <option value="30">30 s</option>
+                            <option value="60">60 s</option>
+                        </select>
+                        <button id="btnChartPause" class="btn btn-secondary btn-sm">Pause</button>
+                        <button id="btnChartClear" class="btn btn-secondary btn-sm">Clear</button>
+                    </span>
+                </div>
+                <div class="chart-legend">
+                    <label class="legend-item"><input type="checkbox" data-series="id" checked><span class="swatch"></span>Id <b id="lg_id">-</b></label>
+                    <label class="legend-item"><input type="checkbox" data-series="iq" checked><span class="swatch"></span>Iq <b id="lg_iq">-</b></label>
+                    <label class="legend-item"><input type="checkbox" data-series="vd" checked><span class="swatch"></span>Ud <b id="lg_vd">-</b></label>
+                    <label class="legend-item"><input type="checkbox" data-series="vq" checked><span class="swatch"></span>Uq <b id="lg_vq">-</b></label>
+                </div>
+                <canvas id="focChart" class="foc-chart"></canvas>
+            </div>
+
+            <div class="card log-card">
+                <div class="card-title">
+                    <span>Log</span>
+                    <button id="btnClearLog" class="btn btn-secondary btn-sm">Clear Log</button>
+                </div>
+                <div id="logConsole" class="log-console"></div>
+            </div>
+
         </div>
 
     </div>
@@ -259,7 +375,9 @@
     <!-- Scripts -->
     <script src="js/version.js"></script>
     <script src="js/protocol.js"></script>
+    <script src="js/diagcodes.js"></script>
     <script src="js/serial.js"></script>
+    <script src="js/chart.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

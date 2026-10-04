@@ -408,7 +408,6 @@ class WebSerialController {
             droppedChars: p.droppedChars,
             noEnd: p.errNoEnd,
             noStart: p.errNoStart,
-            ids: Object.entries(this.msgCounts).map(([id, n]) => `${MotorProtocol.getMessageIdName(Number(id))}x${n}`),
             statusAgeMs: this.lastStatusSeen ? performance.now() - this.lastStatusSeen : null
         };
     }

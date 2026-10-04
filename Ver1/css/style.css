@@ -14,7 +14,7 @@ body {
 }
 
 .app-container {
-    max-width: 1080px;
+    max-width: 1240px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
@@ -420,4 +420,760 @@ body {
     font-family: Consolas, "Courier New", monospace;
     font-size: 11px;
     color: #475569;
+}
+
+/* Lower section: chart on the left, log on the right */
+.lower-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+    gap: 14px;
+    align-items: stretch;
+}
+
+@media (max-width: 860px) {
+    .lower-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.chart-card,
+.log-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.chart-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 400;
+}
+
+.chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 6px;
+    font-size: 12px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.legend-item input {
+    display: none;
+}
+
+.legend-item .swatch {
+    width: 14px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--c);
+}
+
+.legend-item input:not(:checked) ~ .swatch {
+    background: #cbd5e1;
+}
+
+/* Fixed-width value field so the legend never reflows as the numbers change */
+.legend-item b {
+    display: inline-block;
+    width: 10ch;
+    text-align: right;
+    white-space: nowrap;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.legend-item {
+    white-space: nowrap;
+}
+
+.foc-chart {
+    width: 100%;
+    height: 340px;
+    display: block;
+}
+
+/* The log fills the right-hand card down to the chart's height */
+.log-card .log-console {
+    /* Zero flex-basis keeps the log's content out of the card's height: the row is sized by
+       the chart, and the log scrolls inside it instead of growing with every new line. */
+    flex: 1 1 0;
+    height: 0;
+    min-height: 280px;
+}
+
+/* Connection statistics, under the port configuration */
+.conn-stats {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #ebeef5;
+}
+
+.conn-stats-counters {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.conn-stats .rx-diag-row {
+    margin: 4px 0 0;
+}
+
+/* Log lines for decoded diagnostic events (colours follow the Python app's STYLE_ANSI) */
+.log-console > span {
+    display: block;
+}
+
+.log-diag {
+    padding: 0 4px;
+    border-radius: 2px;
+}
+
+.log-diag .log-seq {
+    color: #94a3b8;
+    white-space: pre;
+}
+
+.log-normal    { color: #cdd6f4; }
+.log-error     { color: #ffffff; background-color: #dc2626; font-weight: 700; }
+.log-warning   { color: #000000; background-color: #facc15; }
+.log-op_state  { color: #e0e0e0; background-color: #1496bb; }
+.log-text_resp { color: #000000; background-color: #22d3ee; }
+.log-prc       { color: #3b2fd8; background-color: #aef5d4; }
+.log-prc_pass  { color: #ffff3f; background-color: #80b918; font-weight: 700; }
+.log-highlight { color: #ffffff; background-color: #000000; }
+.log-power_up  { color: #4ade80; }
+
+/* Faults & warnings panel */
+.faults-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 22px;
+}
+
+.fault-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.group-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    margin-right: 2px;
+}
+
+/* An indicator is white while clear, red (fault) or orange (warning) while active */
+.fault-chip {
+    min-width: 44px;
+    padding: 3px 8px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    cursor: help;
+    user-select: none;
+}
+
+.fault-chip.fault.active {
+    color: #ffffff;
+    background-color: #ef0000;
+    border-color: #b91c1c;
+}
+
+.fault-chip.warning.active {
+    color: #000000;
+    background-color: #ffaa00;
+    border-color: #d97706;
+}
+
+/* Short grey remark next to a card title */
+.card-hint {
+    font-size: 11px;
+    font-weight: 400;
+    color: #94a3b8;
+}
+
+/* Disabled buttons */
+.btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* ------------------------------------------------------------------ */
+/* Theme switch (header)                                               */
+/* ------------------------------------------------------------------ */
+.conn-header .theme-switch {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+    margin-right: 14px;
+}
+
+.theme-btn {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 50%;
+    border: 2px solid #cbd5e1;
+    cursor: pointer;
+}
+
+/* Each swatch previews its own theme whichever theme is active */
+.theme-default { background: linear-gradient(135deg, #0066cc 50%, #f0f2f5 50%); }
+.theme-python  { background: linear-gradient(135deg, #00ff7f 50%, #9dc08b 50%); }
+
+.theme-btn[aria-pressed="true"] {
+    border-color: #1c1e21;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
+}
+
+/* ------------------------------------------------------------------ */
+/* "Python app" theme - colours taken from MotorCtrl/UI/motor_control.ui */
+/*   window #9DC08B, panels #EDF1D6 with grey outset border, text        */
+/*   #40513B, buttons rgb(0,255,127) / hover (80,230,80) / pressed       */
+/*   (0,155,0), stop & disconnect red, Self-Test yellow                  */
+/* ------------------------------------------------------------------ */
+html[data-theme="python"] body {
+    background-color: #9dc08b;
+    color: #000000;
+}
+
+html[data-theme="python"] .card {
+    background: #edf1d6;
+    border: 2px outset grey;
+    border-radius: 3px;
+    box-shadow: none;
+}
+
+html[data-theme="python"] .card-title,
+html[data-theme="python"] .port-config-title,
+html[data-theme="python"] .form-label,
+html[data-theme="python"] .status-field label,
+html[data-theme="python"] .group-label,
+html[data-theme="python"] .app-title {
+    color: #40513b;
+}
+
+html[data-theme="python"] .card-title {
+    border-bottom-color: rgba(64, 81, 59, 0.25);
+}
+
+html[data-theme="python"] .port-config-section {
+    background: rgba(255, 255, 255, 0.45);
+    border-color: grey;
+}
+
+html[data-theme="python"] .conn-stats,
+html[data-theme="python"] .options-row {
+    border-top-color: rgba(64, 81, 59, 0.25);
+}
+
+html[data-theme="python"] .conn-stats-counters,
+html[data-theme="python"] .rx-diag,
+html[data-theme="python"] .limit-hint,
+html[data-theme="python"] .card-hint {
+    color: #40513b;
+}
+
+html[data-theme="python"] .select-input,
+html[data-theme="python"] .text-input,
+html[data-theme="python"] .status-field input {
+    background-color: #ffffff;
+    border: 1px solid #555555;
+    border-radius: 3px;
+    color: #000000;
+}
+
+html[data-theme="python"] .rpm-big-text {
+    color: #2c5ead;
+}
+
+/* Buttons: spring green, outset border, darker when pressed */
+html[data-theme="python"] .btn {
+    color: #000000;
+    background-color: rgb(0, 255, 127);
+    border: 1px solid #555555;
+    border-style: outset;
+    border-radius: 3px;
+}
+
+html[data-theme="python"] .btn:hover:not(:disabled) {
+    background-color: rgb(80, 230, 80);
+    border-style: inset;
+    border-color: #aaaaaa;
+}
+
+html[data-theme="python"] .btn:active:not(:disabled) {
+    background-color: rgb(0, 155, 0);
+    border-style: inset;
+    border-color: #aaaaaa;
+}
+
+html[data-theme="python"] .btn:disabled {
+    background-color: rgb(0, 155, 0);
+    opacity: 0.55;
+}
+
+html[data-theme="python"] .btn-danger,
+html[data-theme="python"] .btn-stop {
+    background-color: rgb(255, 100, 100);
+    color: #000000;
+}
+
+html[data-theme="python"] .btn-danger:hover:not(:disabled),
+html[data-theme="python"] .btn-stop:hover:not(:disabled) {
+    background-color: rgb(230, 80, 80);
+}
+
+html[data-theme="python"] .btn-danger:active:not(:disabled),
+html[data-theme="python"] .btn-stop:active:not(:disabled) {
+    background-color: rgb(180, 80, 80);
+}
+
+html[data-theme="python"] #btnSelfTest {
+    background-color: rgb(255, 255, 0);
+}
+
+html[data-theme="python"] #btnSelfTest:hover:not(:disabled) {
+    background-color: rgb(230, 230, 80);
+}
+
+html[data-theme="python"] #btnSelfTest:active:not(:disabled) {
+    background-color: rgb(180, 180, 80);
+}
+
+/* Log: black on white like the Python log view, with its colour styles kept */
+html[data-theme="python"] .log-console {
+    background-color: #ffffff;
+    color: #000000;
+    border: 1px solid #555555;
+}
+
+html[data-theme="python"] .log-normal   { color: #000000; }
+html[data-theme="python"] .log-power_up { color: #14803a; }
+html[data-theme="python"] .log-seq      { color: #6b7280; }
+html[data-theme="python"] .log-op_state { color: #ffffff; background-color: #1496bb; }
+
+/* Fault indicators keep red / orange when active; the clear state is the Python white label */
+html[data-theme="python"] .fault-chip {
+    border: 1px inset #888888;
+    border-radius: 3px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Canvas colours (chart + slider ticks) - read by the scripts.         */
+/* Default values match the light themes; dark themes override them.    */
+/* ------------------------------------------------------------------ */
+:root {
+    --chart-grid: #e2e8f0;
+    --chart-grid-minor: #eef2f7;
+    --chart-zero: #64748b;
+    --chart-text: #475569;
+    --chart-title: #334155;
+    --chart-border: #94a3b8;
+    --chart-hint: #94a3b8;
+    --chart-id: #2563eb;
+    --chart-iq: #dc2626;
+    --chart-vd: #f59e0b;
+    --chart-vq: #16a34a;
+    --tick-minor: #a0aec0;
+    --tick-major: #4a5568;
+    --tick-text: #2d3748;
+}
+
+.legend-item:nth-child(1) { --c: var(--chart-id); }
+.legend-item:nth-child(2) { --c: var(--chart-iq); }
+.legend-item:nth-child(3) { --c: var(--chart-vd); }
+.legend-item:nth-child(4) { --c: var(--chart-vq); }
+
+/* Swatches for the two additional themes */
+.theme-retro { background: linear-gradient(135deg, #33ff33 50%, #000000 50%); }
+.theme-fresh { background: linear-gradient(135deg, #6366f1 50%, #22d3ee 50%); }
+
+/* ------------------------------------------------------------------ */
+/* Dark themes ("retro" and "fresh") share one set of rules driven by   */
+/* the design tokens each theme defines further down.                   */
+/* ------------------------------------------------------------------ */
+html:is([data-theme="retro"], [data-theme="fresh"]) {
+    color-scheme: dark;
+    accent-color: var(--accent);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) body {
+    background: var(--bg);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: var(--font);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+    -webkit-backdrop-filter: var(--card-blur);
+    backdrop-filter: var(--card-blur);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) :is(.card-title, .app-title, .port-config-title, .form-label, .status-field label, .group-label, .chk-group) {
+    color: var(--title);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .card-title {
+    border-bottom-color: var(--rule);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .port-config-section {
+    background: var(--section-bg);
+    border-color: var(--rule);
+    border-radius: var(--radius-sm);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) :is(.conn-stats, .options-row) {
+    border-top-color: var(--rule);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) :is(.conn-stats-counters, .rx-diag, .limit-hint, .card-hint, .legend-item) {
+    color: var(--muted);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .legend-item b {
+    color: var(--text);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) :is(.select-input, .text-input, .status-field input) {
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--input-text);
+    border-radius: var(--radius-sm);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) :is(.select-input, .text-input):focus {
+    border-color: var(--accent);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .rpm-big-text {
+    color: var(--rpm-color);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .rpm-slider {
+    background: var(--slider-bg);
+}
+
+/* Buttons */
+html:is([data-theme="retro"], [data-theme="fresh"]) .btn {
+    background: var(--btn-bg);
+    color: var(--btn-text);
+    border: 1px solid var(--btn-border);
+    border-radius: var(--radius-sm);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .btn:hover:not(:disabled) {
+    background: var(--btn-hover);
+    color: var(--btn-hover-text);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .btn:active:not(:disabled) {
+    background: var(--btn-active);
+    color: var(--btn-hover-text);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .btn:disabled {
+    opacity: 0.4;
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .btn-primary {
+    background: var(--primary-bg);
+    color: var(--primary-text);
+    border-color: var(--primary-border);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .btn-primary:hover:not(:disabled) {
+    background: var(--primary-bg);
+    color: var(--primary-text);
+    filter: brightness(1.15);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .btn-danger {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    border-color: var(--danger-border);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .btn-danger:hover:not(:disabled) {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    filter: brightness(1.15);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .btn-stop {
+    background: var(--stop-bg);
+    color: var(--stop-text);
+    border-color: var(--stop-border);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .btn-stop:hover:not(:disabled) {
+    background: var(--stop-hover);
+    color: var(--stop-hover-text);
+}
+
+/* Badges, alerts, indicators */
+html:is([data-theme="retro"], [data-theme="fresh"]) .status-badge.connected {
+    background: var(--ok-bg);
+    color: var(--ok-text);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .status-badge.disconnected {
+    background: var(--bad-bg);
+    color: var(--bad-text);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .alert-warning {
+    background: var(--warn-bg);
+    border-color: var(--warn-border);
+    color: var(--warn-text);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .fault-chip {
+    background: var(--chip-bg);
+    color: var(--chip-text);
+    border: 1px solid var(--chip-border);
+    border-radius: var(--radius-sm);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .fault-chip.fault.active {
+    background: #ef0000;
+    color: #ffffff;
+    border-color: #ff6b6b;
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .fault-chip.warning.active {
+    background: #ffaa00;
+    color: #000000;
+    border-color: #ffd37a;
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .theme-btn {
+    border-color: var(--rule);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .theme-btn[aria-pressed="true"] {
+    border-color: var(--text);
+    box-shadow: 0 0 0 2px var(--rule);
+}
+
+/* Log */
+html:is([data-theme="retro"], [data-theme="fresh"]) .log-console {
+    background: var(--log-bg);
+    color: var(--log-text);
+    border: 1px solid var(--log-border);
+    border-radius: var(--radius-sm);
+}
+
+html:is([data-theme="retro"], [data-theme="fresh"]) .log-normal { color: var(--log-text); }
+html:is([data-theme="retro"], [data-theme="fresh"]) .log-seq { color: var(--muted); }
+html:is([data-theme="retro"], [data-theme="fresh"]) .log-highlight { box-shadow: inset 0 0 0 1px var(--muted); }
+
+/* ------------------------------------------------------------------ */
+/* Theme: retro - 1980s green-phosphor CRT terminal                     */
+/* ------------------------------------------------------------------ */
+html[data-theme="retro"] {
+    --accent: #33ff33;
+    --bg: #020802;
+    --text: #33ff33;
+    --title: #33ff33;
+    --muted: #1fa81f;
+    --font: "Courier New", Consolas, "Lucida Console", monospace;
+    --radius: 0;
+    --radius-sm: 0;
+    --card-bg: #041404;
+    --card-border: #1fa81f;
+    --card-shadow: 0 0 14px rgba(51, 255, 51, 0.16), inset 0 0 0 1px #0a3d0a;
+    --card-blur: none;
+    --rule: #146014;
+    --section-bg: #030c03;
+    --input-bg: #000000;
+    --input-border: #1fa81f;
+    --input-text: #33ff33;
+    --btn-bg: transparent;
+    --btn-text: #33ff33;
+    --btn-border: #33ff33;
+    --btn-hover: #33ff33;
+    --btn-hover-text: #000000;
+    --btn-active: #1fa81f;
+    --primary-bg: #33ff33;
+    --primary-text: #000000;
+    --primary-border: #33ff33;
+    --danger-bg: #ff3333;
+    --danger-text: #000000;
+    --danger-border: #ff3333;
+    --stop-bg: transparent;
+    --stop-text: #ff3333;
+    --stop-border: #ff3333;
+    --stop-hover: #ff3333;
+    --stop-hover-text: #000000;
+    --rpm-color: #ffb000;
+    --slider-bg: #0f3d0f;
+    --log-bg: #000000;
+    --log-text: #33ff33;
+    --log-border: #1fa81f;
+    --chip-bg: #000000;
+    --chip-text: #1fa81f;
+    --chip-border: #146014;
+    --ok-bg: #0a3d0a;
+    --ok-text: #33ff33;
+    --bad-bg: #3d0a0a;
+    --bad-text: #ff3333;
+    --warn-bg: #2b2000;
+    --warn-border: #ffb000;
+    --warn-text: #ffb000;
+
+    --chart-grid: #0f4d0f;
+    --chart-grid-minor: #0a2e0a;
+    --chart-zero: #1fa81f;
+    --chart-text: #33ff33;
+    --chart-title: #33ff33;
+    --chart-border: #1fa81f;
+    --chart-hint: #1fa81f;
+    --chart-id: #00e5ff;
+    --chart-iq: #ff5555;
+    --chart-vd: #ffb000;
+    --chart-vq: #b6ff3c;
+    --tick-minor: #146014;
+    --tick-major: #33ff33;
+    --tick-text: #33ff33;
+}
+
+html[data-theme="retro"] body {
+    text-shadow: 0 0 3px rgba(51, 255, 51, 0.4);
+}
+
+html[data-theme="retro"] :is(.card-title, .port-config-title) {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+html[data-theme="retro"] .rpm-big-text {
+    text-shadow: 0 0 8px rgba(255, 176, 0, 0.6);
+}
+
+html[data-theme="retro"] .btn {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+html[data-theme="retro"] .btn:disabled {
+    border-style: dashed;
+}
+
+/* CRT scanlines over the whole page */
+html[data-theme="retro"] body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.2) 0, rgba(0, 0, 0, 0.2) 1px, transparent 1px, transparent 3px);
+}
+
+/* ------------------------------------------------------------------ */
+/* Theme: fresh - modern dark glass UI with an indigo/cyan accent       */
+/* ------------------------------------------------------------------ */
+html[data-theme="fresh"] {
+    --accent: #6366f1;
+    --bg: radial-gradient(1100px 600px at 8% -10%, #2b2f77 0%, transparent 60%),
+          radial-gradient(900px 500px at 100% 0%, #0d5566 0%, transparent 55%),
+          #0b1020;
+    --text: #e6e9f5;
+    --title: #f3f5ff;
+    --muted: #9aa4c7;
+    --font: Inter, "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    --radius: 14px;
+    --radius-sm: 9px;
+    --card-bg: rgba(255, 255, 255, 0.06);
+    --card-border: rgba(255, 255, 255, 0.12);
+    --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+    --card-blur: blur(14px);
+    --rule: rgba(255, 255, 255, 0.1);
+    --section-bg: rgba(255, 255, 255, 0.04);
+    --input-bg: rgba(255, 255, 255, 0.07);
+    --input-border: rgba(255, 255, 255, 0.16);
+    --input-text: #e6e9f5;
+    --btn-bg: rgba(255, 255, 255, 0.09);
+    --btn-text: #e6e9f5;
+    --btn-border: rgba(255, 255, 255, 0.16);
+    --btn-hover: rgba(255, 255, 255, 0.18);
+    --btn-hover-text: #ffffff;
+    --btn-active: rgba(255, 255, 255, 0.26);
+    --primary-bg: linear-gradient(135deg, #6366f1, #22d3ee);
+    --primary-text: #06101f;
+    --primary-border: transparent;
+    --danger-bg: #f43f5e;
+    --danger-text: #ffffff;
+    --danger-border: transparent;
+    --stop-bg: rgba(244, 63, 94, 0.16);
+    --stop-text: #fda4af;
+    --stop-border: rgba(244, 63, 94, 0.4);
+    --stop-hover: rgba(244, 63, 94, 0.32);
+    --stop-hover-text: #ffe4e8;
+    --rpm-color: #7dd3fc;
+    --slider-bg: rgba(255, 255, 255, 0.14);
+    --log-bg: #070b18;
+    --log-text: #cbd5e1;
+    --log-border: rgba(255, 255, 255, 0.1);
+    --chip-bg: rgba(255, 255, 255, 0.06);
+    --chip-text: #8b95b8;
+    --chip-border: rgba(255, 255, 255, 0.12);
+    --ok-bg: rgba(52, 211, 153, 0.16);
+    --ok-text: #34d399;
+    --bad-bg: rgba(244, 63, 94, 0.16);
+    --bad-text: #fb7185;
+    --warn-bg: rgba(251, 191, 36, 0.12);
+    --warn-border: rgba(251, 191, 36, 0.35);
+    --warn-text: #fcd34d;
+
+    --chart-grid: rgba(255, 255, 255, 0.09);
+    --chart-grid-minor: rgba(255, 255, 255, 0.05);
+    --chart-zero: rgba(255, 255, 255, 0.4);
+    --chart-text: #9aa4c7;
+    --chart-title: #c7cdea;
+    --chart-border: rgba(255, 255, 255, 0.22);
+    --chart-hint: #6b7497;
+    --chart-id: #60a5fa;
+    --chart-iq: #fb7185;
+    --chart-vd: #fbbf24;
+    --chart-vq: #34d399;
+    --tick-minor: rgba(255, 255, 255, 0.3);
+    --tick-major: rgba(255, 255, 255, 0.7);
+    --tick-text: #9aa4c7;
+}
+
+html[data-theme="fresh"] .btn {
+    transition: background 0.15s, transform 0.1s, filter 0.15s;
+}
+
+html[data-theme="fresh"] .btn:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+html[data-theme="fresh"] .card-title {
+    letter-spacing: 0.01em;
 }

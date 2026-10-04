@@ -64,7 +64,17 @@ const DIAG_RequestIdEnum = Object.freeze({
     DIAG_REQ_AUTO_CAL_FAST: 0x00A3,
     DIAG_REQ_CAL_FIND_INDEX: 0x00A6,
     DIAG_REQ_AUTO_CAL_SLOW: 0x00A7,
-    DIAG_REQ_AUTO_CAL_CURRENT_SENS: 0x00A8
+    DIAG_REQ_AUTO_CAL_CURRENT_SENS: 0x00A8,
+    DIAG_REQ_BEEP: 0x00AB,
+    DIAG_REQ_SOUND_PATTERN: 0x00AC,
+    DIAG_REQ_TEST_TRIG_F_OC: 0x0200,
+    DIAG_REQ_TEST_TRIG_F_OV: 0x0201,
+    DIAG_REQ_TEST_TRIG_F_OT: 0x0202,
+    DIAG_REQ_TEST_TRIG_F_STALL: 0x0203,
+    DIAG_REQ_TEST_TRIG_F_UV: 0x0204,
+    DIAG_REQ_TEST_TRIG_F_SM: 0x0205,
+    DIAG_REQ_TEST_TRIG_W_HT: 0x0220,
+    DIAG_REQ_TEST_TRIG_W_SM: 0x0221
 });
 
 const SRC_DEST = Object.freeze({
@@ -368,6 +378,46 @@ function unpackStatusPayload(payload) {
 }
 
 /**
+ * Unpack MSG_ID_V_AC_STATUS (MSG_ACVectorSpaceMsg, sent every ~50 ms): the rotating-frame
+ * currents (mA) and voltages (mV) the Python app charts. Format: '<iiiii' (20 bytes).
+ */
+function unpackVacStatusPayload(payload) {
+    if (!payload || payload.length < 16) {
+        return null;
+    }
+    const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+    return {
+        id:    view.getInt32(0, true),
+        iq:    view.getInt32(4, true),
+        vd:    view.getInt32(8, true),
+        vq:    view.getInt32(12, true),
+        theta: payload.length >= 20 ? view.getInt32(16, true) : 0
+    };
+}
+
+/**
+ * Unpack MSG_ID_DIAG_INFO (MSG_DiagReport): diagnostic event code plus four data words.
+ * Format: '<HIHBIIII' (25 bytes) - code, tick (ms), tickMS (unused, always 0), seq, data1..4.
+ */
+function unpackDiagInfoPayload(payload) {
+    if (!payload || payload.length < 25) {
+        return null;
+    }
+    const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+    return {
+        code: view.getUint16(0, true),
+        tick: view.getUint32(2, true),
+        seq:  view.getUint8(8),
+        data: [
+            view.getUint32(9, true),
+            view.getUint32(13, true),
+            view.getUint32(17, true),
+            view.getUint32(21, true)
+        ]
+    };
+}
+
+/**
  * Unpack a message buffer returned by ProtocolParser.
  */
 function unpackMessage(rawMsg) {
@@ -387,6 +437,16 @@ function unpackMessage(rawMsg) {
         status = unpackStatusPayload(payload);
     }
 
+    let vac = null;
+    if (msgId === DIAG_MessageIdEnum.MSG_ID_V_AC_STATUS) {
+        vac = unpackVacStatusPayload(payload);
+    }
+
+    let diag = null;
+    if (msgId === DIAG_MessageIdEnum.MSG_ID_DIAG_INFO) {
+        diag = unpackDiagInfoPayload(payload);
+    }
+
     return {
         msgId,
         msgIdName: getMessageIdName(msgId),
@@ -396,6 +456,8 @@ function unpackMessage(rawMsg) {
         mode,
         payload,
         status,
+        vac,
+        diag,
         crc: rawMsg.length > 6 + payloadSize ? rawMsg[rawMsg.length - 1] : null,
         raw: rawMsg
     };
@@ -419,6 +481,8 @@ if (typeof module !== 'undefined' && module.exports) {
         buildDiagRequest,
         buildStatusRequest,
         unpackStatusPayload,
+        unpackVacStatusPayload,
+        unpackDiagInfoPayload,
         unpackMessage
     };
 } else {
@@ -438,6 +502,8 @@ if (typeof module !== 'undefined' && module.exports) {
         buildDiagRequest,
         buildStatusRequest,
         unpackStatusPayload,
+        unpackVacStatusPayload,
+        unpackDiagInfoPayload,
         unpackMessage
     };
 }
