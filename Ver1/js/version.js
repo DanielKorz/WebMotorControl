@@ -3,9 +3,16 @@
  * Bump APP_VERSION and add an entry at the top of APP_CHANGELOG for every behavioural change.
  * The version is shown in the header, logged to the console log at start-up and on connect.
  */
-const APP_VERSION = "1.7.1";
+const APP_VERSION = "1.7.2";
 
 const APP_CHANGELOG = [
+    {
+        version: "1.7.2",
+        date: "2026-10-04",
+        changes: [
+            "Footer with the KDIT Consulting Limited logo (28 px high, the height of a text box)."
+        ]
+    },
     {
         version: "1.7.1",
         date: "2026-10-04",
