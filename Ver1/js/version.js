@@ -3,9 +3,26 @@
  * Bump APP_VERSION and add an entry at the top of APP_CHANGELOG for every behavioural change.
  * The version is shown in the header, logged to the console log at start-up and on connect.
  */
-const APP_VERSION = "1.7.2";
+const APP_VERSION = "1.8.0";
 
 const APP_CHANGELOG = [
+    {
+        version: "1.8.0",
+        date: "2026-10-06",
+        changes: [
+            "Motor selector (iND060 24 V / iND057 48 V) next to the limits: sets the BEMF constant used in the dq-ceiling hint (2.20 / 3.80 V per krpm) and the default Max V (24000 / 48000) and Max I (22000 / 25000); remembered between visits.",
+            "Max I input capped at 25000 mA (current sense range)."
+        ]
+    },
+    {
+        version: "1.7.3",
+        date: "2026-10-06",
+        changes: [
+            "Diagnostic log decodes the new firmware codes: V-I sweep (0x010C, 0x0152, 0x0153) and pole-pair angle table (0x0170-0x0172); control state 20 (CONTROL_CAL_VI_SWEEP) now has a name (tables synced with MotorCtrl).",
+            "Request ids added for CAL_LOAD, CAL_SAVE, AUTO_CAL_RL and AUTO_CAL_VI_SWEEP (no buttons yet).",
+            "dq voltage ceiling shown in the status panel is limited by the measured bus voltage, because the firmware clamps Max V to the configured supply (a 24 V bus no longer shows a 27.7 V ceiling)."
+        ]
+    },
     {
         version: "1.7.2",
         date: "2026-10-04",

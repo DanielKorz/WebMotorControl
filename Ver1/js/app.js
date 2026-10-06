@@ -25,6 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const maxVInput = document.getElementById("maxVInput");
     const maxIInput = document.getElementById("maxIInput");
+    const motorSelect = document.getElementById("motorSelect");
     const statusAge = document.getElementById("statusAge");
     const rxDiag = document.getElementById("rxDiag");
 
@@ -239,10 +240,26 @@ document.addEventListener("DOMContentLoaded", () => {
     // next start from standstill.
     const limitHint = document.getElementById("limitHint");
 
+    // Motor presets (MotorDriver/Source/MOTOR_DEF): peak-phase BEMF constant, nominal bus and the default limits.
+    // maxI stays inside the sense chain's range (about 27 A peak on the most sensitive phase after the gain calibration).
+    const MOTORS = {
+        ind060: { name: "iND060", keMvPerRpm: 2.20, maxV: 24000, maxI: 22000 },
+        ind057: { name: "iND057", keMvPerRpm: 3.80, maxV: 48000, maxI: 25000 }
+    };
+    const MOTOR_KEY = "motorctrl.motor";
+    let motorId = "ind060";
+    try {
+        const saved = localStorage.getItem(MOTOR_KEY);
+        if (saved && MOTORS[saved]) motorId = saved;
+    } catch (e) { /* storage blocked: keep the default */ }
+
     function updateLimitHint() {
-        const dqLimitMv = (serial.maxV * 591) >> 10; // control_voltageLimitMV() in APP_control.c
-        const bemfRpm = Math.round(dqLimitMv / 3.8);   // iND057: 3.8 mV per rpm
-        limitHint.textContent = `dq ceiling ≈ ${(dqLimitMv / 1000).toFixed(1)} V (BEMF alone reaches it at ≈ ${bemfRpm} rpm)`;
+        const motor = MOTORS[motorId];
+        // The firmware clamps Max V to the configured supply, so a nominal bus lower than Max V sets the ceiling
+        const effMaxV = Math.min(serial.maxV, motor.maxV);
+        const dqLimitMv = (effMaxV * 591) >> 10;    // control_voltageLimitMV() in APP_control.c
+        const bemfRpm = Math.round(dqLimitMv / motor.keMvPerRpm);
+        limitHint.textContent = `${motor.name}: dq ceiling ≈ ${(dqLimitMv / 1000).toFixed(1)} V (BEMF alone reaches it at ≈ ${bemfRpm} rpm)`;
         limitHint.classList.toggle("warn", bemfRpm < 6500);
     }
 
@@ -259,8 +276,26 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     bindLimit(maxVInput, "maxV", 1000, 48000);
-    bindLimit(maxIInput, "maxI", 0, 30000);
-    updateLimitHint();
+    bindLimit(maxIInput, "maxI", 0, 25000);
+
+    function applyMotorPreset(id, persist) {
+        if (!MOTORS[id]) return;
+        motorId = id;
+        motorSelect.value = id;
+        serial.maxV = MOTORS[id].maxV;
+        serial.maxI = MOTORS[id].maxI;
+        maxVInput.value = serial.maxV;
+        maxIInput.value = serial.maxI;
+        if (persist) {
+            try { localStorage.setItem(MOTOR_KEY, id); } catch (e) { /* storage blocked */ }
+        }
+        updateLimitHint();
+    }
+    motorSelect.addEventListener("change", () => {
+        applyMotorPreset(motorSelect.value, true);
+        appendLog(`[MOTOR] ${MOTORS[motorId].name}: Max V ${serial.maxV} mV, Max I ${serial.maxI} mA (applies on the next start from standstill)\n`);
+    });
+    applyMotorPreset(motorId, false);
 
     // ---------------- 5. Canvas Slider Ticks ----------------
     function drawSliderTicks() {
@@ -416,7 +451,9 @@ document.addEventListener("DOMContentLoaded", () => {
         // Magnitude of the dq voltage vector against the ceiling the firmware derives from
         // Max V - when this sits at the limit the current loop has run out of voltage.
         const vdq = Math.round(Math.hypot(s.vq, s.vd));
-        const dqLimit = (serial.maxV * 591) >> 10;
+        // maxV is clamped to the configured supply by the firmware; the measured bus stands in for it
+        const effMaxV = s.supplyVoltage > 6000 ? Math.min(serial.maxV, s.supplyVoltage) : Math.min(serial.maxV, MOTORS[motorId].maxV);
+        const dqLimit = (effMaxV * 591) >> 10;
         statusInputs.vdq.value = `${vdq} mV (limit ≈ ${dqLimit})`;
         statusInputs.vdq.classList.toggle("warn", vdq > dqLimit * 0.95);
 

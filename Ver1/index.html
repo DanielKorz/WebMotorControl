@@ -176,10 +176,15 @@
 
                 <!-- Limits sent with every demand (latched by firmware at run start) -->
                 <div class="options-row limits-row">
+                    <label for="motorSelect" class="form-label">Motor:</label>
+                    <select id="motorSelect" class="select-input" title="Sets the BEMF constant used in the hint below and the default Max V / Max I limits">
+                        <option value="ind060">iND060 (24 V)</option>
+                        <option value="ind057">iND057 (48 V)</option>
+                    </select>
                     <label for="maxVInput" class="form-label">Max V (mV):</label>
                     <input id="maxVInput" type="number" min="1000" max="48000" step="1000" class="text-input" style="width: 90px;">
                     <label for="maxIInput" class="form-label">Max I (mA):</label>
-                    <input id="maxIInput" type="number" min="0" max="30000" step="1000" class="text-input" style="width: 90px;">
+                    <input id="maxIInput" type="number" min="0" max="25000" step="1000" class="text-input" style="width: 90px;" title="The current sense chain measures about 27 A peak on the most sensitive phase; the firmware also clamps this to its configured current limit">
                     <span id="limitHint" class="limit-hint"></span>
                 </div>
 
