@@ -25,6 +25,8 @@ const DIAG_MessageIdEnum = Object.freeze({
     MSG_ID_DIAG_INFO: 0x22,
     MSG_ID_CONFIG: 0x23,
     MSG_ID_SYSTEM_VERSION: 0x24,
+    MSG_ID_CONTROLLER_INFO: 0x25,
+    MSG_ID_MOTOR_INFO: 0x26,
     MSG_ID_ASSERT: 0x27,
     MSG_ID_PID_REPORT: 0x28,
     MSG_ID_V_AC_STATUS: 0x29,
@@ -333,6 +335,190 @@ function buildStatusRequest(dest = SRC_DEST.SRC_DEST_MC) {
 }
 
 /**
+ * Controller (power board) description, MSG_ID_CONTROLLER_INFO (MSG_ControllerInfo in the firmware's messages.h).
+ * Payload: '<HHI 16s24s8s 12I 4I' (120 bytes): layout, controllerId, fwVersion, name, model, hwRev, then the
+ * values of the controller header selected in controller.h.
+ */
+function unpackControllerInfoPayload(payload) {
+    if (!payload || payload.length < 120) return null;
+
+    const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+    const text = (offset, length) => {
+        let out = "";
+        for (let i = 0; i < length; i++) {
+            const c = payload[offset + i];
+            if (c === 0) break;
+            out += String.fromCharCode(c);
+        }
+        return out;
+    };
+
+    const u32 = (n) => view.getUint32(56 + 4 * n, true);
+    const info = {
+        layout:       view.getUint16(0, true),
+        controllerId: view.getUint16(2, true),
+        fwVersion:    view.getUint32(4, true),
+        name:         text(8, 16),
+        model:        text(24, 24),
+        hwRev:        text(48, 8),
+        shuntUohm:         u32(0),
+        csaGainX100:       u32(1),
+        adcVrefMv:         u32(2),
+        adcBits:           u32(3),
+        vbusRtopOhm:       u32(4),
+        vbusRbotOhm:       u32(5),
+        iConvMul:          u32(6),
+        iConvShift:        u32(7),
+        iFullScaleMa:      u32(8),
+        overcurrentTripMa: u32(9),
+        vConvMul:          u32(10),
+        vConvShift:        u32(11)
+    };
+    return info;
+}
+
+/**
+ * Motor description, MSG_ID_MOTOR_INFO (MSG_MotorInfo in the firmware's messages.h).
+ * Payload: '<HH 16s24s 40I' (204 bytes): layout, motorId, name, model, then 32 values of the motor header
+ * selected in motor_def.h (fixed-point ones as multiplier / shift pairs) and 8 reserved.
+ */
+const MOTOR_INFO_FIELDS = Object.freeze([
+    "polePairs", "maxRpm", "resistanceMul", "resistanceShift", "inductanceMul", "inductanceShift",
+    "bemfMul", "bemfShift", "torqueMul", "torqueShift", "lagMul", "lagShift1", "lagShift2",
+    "nominalSupplyMv", "minSupplyMv", "maxCurrentLimitMa", "calMaxVoltageMv", "indexingMaxVoltageMv",
+    "currentSensorCalMv", "voltageModeDropMv", "voltageModeExtraRMohm", "voltageRampMvPerMs",
+    "fieldWeakeningMaxIdMa", "leadCoeffMul", "pidCurrentIqKp", "pidCurrentIqKi", "pidCurrentIdKp",
+    "pidCurrentIdKi", "pidSpeedIqKp", "pidSpeedIqKi", "pidSpeedIdKp", "pidSpeedIdKi"
+]);
+
+function unpackMotorInfoPayload(payload) {
+    if (!payload || payload.length < 204) return null;
+
+    const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+    const text = (offset, length) => {
+        let out = "";
+        for (let i = 0; i < length; i++) {
+            const c = payload[offset + i];
+            if (c === 0) break;
+            out += String.fromCharCode(c);
+        }
+        return out;
+    };
+
+    const info = {
+        layout:  view.getUint16(0, true),
+        motorId: view.getUint16(2, true),
+        name:    text(4, 16),
+        model:   text(20, 24)
+    };
+    MOTOR_INFO_FIELDS.forEach((field, i) => { info[field] = view.getUint32(44 + 4 * i, true); });
+    return info;
+}
+
+/**
+ * Controller configuration, MSG_ID_CONFIG (MSG_Configuration in the firmware's messages.h).
+ * Payload '<B IIB III iihiBB BBB BBB iii i' (60 bytes): version, supply, encoder counts, pole pairs, three ramps, limits,
+ * startup flags, phase advance flags, three current gains, run-on-start speed. Firmware older than 2.25 sends 56 bytes
+ * (no run-on-start field).
+ */
+const CONFIG_VERSION_REQ = 3;
+const CONFIG_PAYLOAD_SIZE = 60;
+const CONFIG_PAYLOAD_SIZE_LEGACY = 56;
+
+function unpackConfigPayload(payload) {
+    if (!payload || (payload.length !== CONFIG_PAYLOAD_SIZE && payload.length !== CONFIG_PAYLOAD_SIZE_LEGACY)) return null;
+    const v = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+    const legacy = payload.length === CONFIG_PAYLOAD_SIZE_LEGACY;
+    return {
+        version:                    v.getUint8(0),
+        supplyVoltage_mV:           v.getUint32(1, true),
+        encoderCount:               v.getUint32(5, true),
+        motorPolePairs:             v.getUint8(9),
+        accelerationGradient:       v.getUint32(10, true),
+        fastStopGradient:           v.getUint32(14, true),
+        immediateStopGradient:      v.getUint32(18, true),
+        minSupplyLimit_mV:          v.getInt32(22, true),
+        maxCurrentLimit_mA:         v.getInt32(26, true),
+        maxSpeed_rpm:               v.getInt16(30, true),
+        maxOutputVoltAmpl_mV:       v.getInt32(32, true),
+        maxTemperatureLimit_degC:   v.getUint8(36),
+        temperatureWarning_degC:    v.getUint8(37),
+        loadCalibration:            v.getUint8(38),
+        runSelfTest:                v.getUint8(39),
+        runIndexing:                v.getUint8(40),
+        phaseAdvRpm:                v.getUint8(41),
+        phaseAdvCurrent:            v.getUint8(42),
+        phaseAdvPILoop:             v.getUint8(43),
+        currentConvCoefA:           v.getInt32(44, true),
+        currentConvCoefB:           v.getInt32(48, true),
+        currentConvCoefC:           v.getInt32(52, true),
+        runOnStartAtSpeed_rpm:      legacy ? 0 : v.getInt32(56, true),
+        legacyLayout:               legacy
+    };
+}
+
+/** GET: asks the controller for its configuration */
+function buildConfigGetRequest(dest = SRC_DEST.SRC_DEST_MC) {
+    const rawMsg = buildMessage(DIAG_MessageIdEnum.MSG_ID_CONFIG, new Uint8Array(0), dest, MSG_MODE.GET, SRC_DEST.SRC_DEST_PC);
+    return encodeMessage(rawMsg);
+}
+
+/** SET: writes the configuration (cfg has the fields of unpackConfigPayload); the controller saves it to flash */
+function buildConfigSetMessage(cfg, dest = SRC_DEST.SRC_DEST_MC) {
+    const payload = new Uint8Array(CONFIG_PAYLOAD_SIZE);
+    const v = new DataView(payload.buffer);
+    v.setUint8(0, CONFIG_VERSION_REQ);
+    v.setUint32(1, cfg.supplyVoltage_mV, true);
+    v.setUint32(5, cfg.encoderCount, true);
+    v.setUint8(9, cfg.motorPolePairs);
+    v.setUint32(10, cfg.accelerationGradient, true);
+    v.setUint32(14, cfg.fastStopGradient, true);
+    v.setUint32(18, cfg.immediateStopGradient, true);
+    v.setInt32(22, cfg.minSupplyLimit_mV, true);
+    v.setInt32(26, cfg.maxCurrentLimit_mA, true);
+    v.setInt16(30, cfg.maxSpeed_rpm, true);
+    v.setInt32(32, cfg.maxOutputVoltAmpl_mV, true);
+    v.setUint8(36, cfg.maxTemperatureLimit_degC);
+    v.setUint8(37, cfg.temperatureWarning_degC);
+    v.setUint8(38, cfg.loadCalibration ? 1 : 0);
+    v.setUint8(39, cfg.runSelfTest ? 1 : 0);
+    v.setUint8(40, cfg.runIndexing ? 1 : 0);
+    v.setUint8(41, cfg.phaseAdvRpm ? 1 : 0);
+    v.setUint8(42, cfg.phaseAdvCurrent ? 1 : 0);
+    v.setUint8(43, cfg.phaseAdvPILoop ? 1 : 0);
+    v.setInt32(44, cfg.currentConvCoefA, true);
+    v.setInt32(48, cfg.currentConvCoefB, true);
+    v.setInt32(52, cfg.currentConvCoefC, true);
+    v.setInt32(56, cfg.runOnStartAtSpeed_rpm | 0, true);
+    const rawMsg = buildMessage(DIAG_MessageIdEnum.MSG_ID_CONFIG, payload, dest, MSG_MODE.SET, SRC_DEST.SRC_DEST_PC);
+    return encodeMessage(rawMsg);
+}
+
+/** GET: asks the controller for the motor description */
+function buildMotorInfoRequest(dest = SRC_DEST.SRC_DEST_MC) {
+    const rawMsg = buildMessage(
+        DIAG_MessageIdEnum.MSG_ID_MOTOR_INFO,
+        new Uint8Array(0),
+        dest,
+        MSG_MODE.GET,
+        SRC_DEST.SRC_DEST_PC
+    );
+    return encodeMessage(rawMsg);
+}
+
+/** GET: asks the controller for its description */
+function buildControllerInfoRequest(dest = SRC_DEST.SRC_DEST_MC) {
+    const rawMsg = buildMessage(
+        DIAG_MessageIdEnum.MSG_ID_CONTROLLER_INFO,
+        new Uint8Array(0),
+        dest,
+        MSG_MODE.GET,
+        SRC_DEST.SRC_DEST_PC
+    );
+    return encodeMessage(rawMsg);
+}
+
+/**
  * Unpack CDataStatus from MSG_ID_STATUS payload.
  * Format: '<IH iH IIi hh ii ii I' (48 bytes, or 52 bytes with faultWord)
  */
@@ -451,6 +637,21 @@ function unpackMessage(rawMsg) {
         diag = unpackDiagInfoPayload(payload);
     }
 
+    let motor = null;
+    if (msgId === DIAG_MessageIdEnum.MSG_ID_MOTOR_INFO) {
+        motor = (mode === MSG_MODE.GET_ACK) ? unpackMotorInfoPayload(payload) : null;
+    }
+
+    let controller = null;
+    if (msgId === DIAG_MessageIdEnum.MSG_ID_CONTROLLER_INFO) {
+        controller = (mode === MSG_MODE.GET_ACK) ? unpackControllerInfoPayload(payload) : null;
+    }
+
+    let config = null;
+    if (msgId === DIAG_MessageIdEnum.MSG_ID_CONFIG) {
+        config = (mode === MSG_MODE.GET_ACK) ? unpackConfigPayload(payload) : null;
+    }
+
     return {
         msgId,
         msgIdName: getMessageIdName(msgId),
@@ -462,6 +663,9 @@ function unpackMessage(rawMsg) {
         status,
         vac,
         diag,
+        controller,
+        motor,
+        config,
         crc: rawMsg.length > 6 + payloadSize ? rawMsg[rawMsg.length - 1] : null,
         raw: rawMsg
     };
@@ -484,6 +688,13 @@ if (typeof module !== 'undefined' && module.exports) {
         buildSpeedDemandMessage,
         buildDiagRequest,
         buildStatusRequest,
+        buildControllerInfoRequest,
+        buildMotorInfoRequest,
+        unpackMotorInfoPayload,
+        unpackControllerInfoPayload,
+        buildConfigGetRequest,
+        buildConfigSetMessage,
+        unpackConfigPayload,
         unpackStatusPayload,
         unpackVacStatusPayload,
         unpackDiagInfoPayload,
@@ -505,6 +716,13 @@ if (typeof module !== 'undefined' && module.exports) {
         buildSpeedDemandMessage,
         buildDiagRequest,
         buildStatusRequest,
+        buildControllerInfoRequest,
+        buildMotorInfoRequest,
+        unpackMotorInfoPayload,
+        unpackControllerInfoPayload,
+        buildConfigGetRequest,
+        buildConfigSetMessage,
+        unpackConfigPayload,
         unpackStatusPayload,
         unpackVacStatusPayload,
         unpackDiagInfoPayload,

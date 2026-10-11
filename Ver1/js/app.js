@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnReqStatus = document.getElementById("btnReqStatus");
     const btnFindZero = document.getElementById("btnFindZero");
     const btnSelfTest = document.getElementById("btnSelfTest");
+    const btnControllerInfo = document.getElementById("btnControllerInfo");
     const btnClearFaults = document.getElementById("btnClearFaults");
 
     const txStat = document.getElementById("txStat");
@@ -387,6 +388,23 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // Settings popup (js/settings.js): reads / writes the controller's stored configuration
+    const btnSettings = document.getElementById("btnSettings");
+    const settingsDialog = new SettingsDialog({ serial, appendLog });
+    btnSettings.addEventListener("click", () => settingsDialog.open());
+
+    btnControllerInfo.addEventListener("click", async () => {
+        if (!serial.isConnected()) {
+            alert("Connect to the controller to read its description.");
+            return;
+        }
+        const okController = await serial.requestControllerInfo();
+        const okMotor = await serial.requestMotorInfo();
+        if (okController || okMotor) {
+            appendLog(">>> Requested the controller and motor description (MSG_ID_CONTROLLER_INFO, MSG_ID_MOTOR_INFO)\n");
+        }
+    });
+
     // Same request as the Python app's Self-Test button. The firmware only starts it from idle;
     // progress and the PASSED / FAILED result arrive as diagnostic events in the log.
     btnSelfTest.addEventListener("click", async () => {
@@ -597,6 +615,34 @@ document.addEventListener("DOMContentLoaded", () => {
         appendLog(d.text, d.style, prefix);
     }
 
+    // Controller (power board) description (MSG_ControllerInfo)
+    function logControllerInfo(c) {
+        appendLog("Controller (power board) description", "highlight");
+        appendLog(`  name / model / hw rev : ${c.name} / ${c.model} / ${c.hwRev}  (id ${c.controllerId})`, "normal");
+        appendLog(`  firmware              : ${(c.fwVersion / 100).toFixed(2)}`, "normal");
+        appendLog(`  current sensing       : shunt ${c.shuntUohm} uOhm, amplifier ${(c.csaGainX100 / 100).toString()} V/V, ADC ${c.adcBits} bit / ${c.adcVrefMv} mV`, "normal");
+        appendLog(`  current scaling       : ${(c.iConvMul / (1 << c.iConvShift)).toFixed(3)} mA per count, full scale +-${(c.iFullScaleMa / 1000).toFixed(1)} A`, "normal");
+        appendLog(`  overcurrent threshold : ${(c.overcurrentTripMa / 1000).toFixed(1)} A`, "normal");
+        appendLog(`  voltage divider       : ${c.vbusRtopOhm} / ${c.vbusRbotOhm} ohm, ${(c.vConvMul / (1 << c.vConvShift)).toFixed(3)} mV per count`, "normal");
+    }
+
+    // Motor description (MSG_MotorInfo)
+    function logMotorInfo(m) {
+        const resistance = m.resistanceMul / Math.pow(2, m.resistanceShift);
+        const inductance = m.inductanceMul / Math.pow(2, m.inductanceShift);
+        appendLog("Motor description", "highlight");
+        appendLog(`  name / model          : ${m.name} / ${m.model}  (id ${m.motorId})`, "normal");
+        appendLog(`  poles / max speed     : ${m.polePairs} pole pairs, ${m.maxRpm} rpm`, "normal");
+        appendLog(`  winding (per phase)   : R ${(resistance * 1000).toFixed(2)} mOhm, L ${(inductance * 1e6).toFixed(1)} uH`, "normal");
+        appendLog(`  BEMF / torque const.  : ${(m.bemfMul / Math.pow(2, m.bemfShift)).toFixed(3)} V/krpm, ${(m.torqueMul / Math.pow(2, m.torqueShift)).toFixed(4)} Nm/A`, "normal");
+        appendLog(`  supply (nom / min)    : ${(m.nominalSupplyMv / 1000).toFixed(1)} V / ${(m.minSupplyMv / 1000).toFixed(1)} V, max current default ${(m.maxCurrentLimitMa / 1000).toFixed(1)} A`, "normal");
+        appendLog(`  calibration voltages  : cal ${m.calMaxVoltageMv} mV, index ${m.indexingMaxVoltageMv} mV, current sensor ${m.currentSensorCalMv} mV`, "normal");
+        appendLog(`  voltage control       : drop ${m.voltageModeDropMv} mV, extra R ${m.voltageModeExtraRMohm} mOhm, ramp ${m.voltageRampMvPerMs} mV/ms`, "normal");
+        appendLog(`  field weakening / lead: max Id ${(m.fieldWeakeningMaxIdMa / 1000).toFixed(1)} A, lead coefficient ${m.leadCoeffMul}`, "normal");
+        appendLog(`  current loop Iq / Id  : Kp ${m.pidCurrentIqKp} Ki ${m.pidCurrentIqKi}  /  Kp ${m.pidCurrentIdKp} Ki ${m.pidCurrentIdKi}`, "normal");
+        appendLog(`  speed-mode inner loop : Iq Kp ${m.pidSpeedIqKp} Ki ${m.pidSpeedIqKi}  /  Id Kp ${m.pidSpeedIdKp} Ki ${m.pidSpeedIdKi}`, "normal");
+    }
+
     let lastBadStatusLog = 0;
 
     // Received messages are not echoed to the log; the RX diagnostics line carries the
@@ -608,6 +654,18 @@ document.addEventListener("DOMContentLoaded", () => {
         if (parsed.vac) {
             focChart.addSample(parsed.vac);
             updateChartLegend(parsed.vac);
+        }
+
+        if (parsed.controller) {
+            logControllerInfo(parsed.controller);
+        }
+
+        if (parsed.motor) {
+            logMotorInfo(parsed.motor);
+        }
+
+        if (parsed.config) {
+            settingsDialog.handleConfig(parsed.config);
         }
 
         if (parsed.diag) {

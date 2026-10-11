@@ -23,6 +23,11 @@ class WebSerialController {
         this.maxI = MotorProtocol.DEFAULT_MAX_I_MA;
         this.periodicSend = true;
         this.sendIntervalMs = 200; // 5 Hz
+        // The keep-alive repeats a demand only while it is not 0 rpm: a 0 rpm demand is a STOP to the controller
+        // (it also cancels a run-on-start), so it must not be sent just because the page is connected. An explicit
+        // stop is sent at once and repeated a few times (below) in case one message is lost.
+        this.stopRepeats = 5;
+        this._stopRepeatsLeft = 0;
 
         // Slider drags fire an input event per step; cap what actually goes on the wire
         // (the Python app likewise batches to one message per UI tick).
@@ -242,6 +247,8 @@ class WebSerialController {
 
     setTargetRpm(rpm, sendImmediately = true) {
         this.targetRpm = Math.max(0, Math.min(6000, Math.round(rpm)));
+        // An explicit stop (e.g. STOP button, slider back to 0) gets repeated by the keep-alive for a short while
+        this._stopRepeatsLeft = (this.targetRpm === 0) ? this.stopRepeats : 0;
         if (sendImmediately && this.isConnected()) {
             this._scheduleDemand();
         }
@@ -277,6 +284,30 @@ class WebSerialController {
         if (ok && this.onTx) {
             this.onTx(rpm, this.txCount);
         }
+    }
+
+    /** Asks the controller for its description (MSG_ID_CONTROLLER_INFO, GET); the reply arrives as a message with .controller */
+    async requestControllerInfo() {
+        if (!this.isConnected()) return false;
+        return await this.sendBytes(MotorProtocol.buildControllerInfoRequest());
+    }
+
+    /** Asks the controller for its configuration (MSG_ID_CONFIG, GET); the reply arrives as a message with .config */
+    async requestConfig() {
+        if (!this.isConnected()) return false;
+        return await this.sendBytes(MotorProtocol.buildConfigGetRequest());
+    }
+
+    /** Writes the configuration (MSG_ID_CONFIG, SET); the controller saves it to flash */
+    async sendConfig(cfg) {
+        if (!this.isConnected()) return false;
+        return await this.sendBytes(MotorProtocol.buildConfigSetMessage(cfg));
+    }
+
+    /** Asks the controller for the motor description (MSG_ID_MOTOR_INFO, GET); the reply arrives as a message with .motor */
+    async requestMotorInfo() {
+        if (!this.isConnected()) return false;
+        return await this.sendBytes(MotorProtocol.buildMotorInfoRequest());
     }
 
     async SendDiagRequest(req, d0 = 0, d1 = 0, d2 = 0, d3 = 0) {
@@ -376,7 +407,12 @@ class WebSerialController {
         this.timerId = setInterval(() => {
             if (!this.connected) return;
             if (this.periodicSend) {
-                this.sendDemandNow();
+                if (this.targetRpm !== 0) {
+                    this.sendDemandNow();
+                } else if (this._stopRepeatsLeft > 0) {
+                    this._stopRepeatsLeft--;
+                    this.sendDemandNow();
+                }
             }
             this._checkStatusWatchdog();
         }, this.sendIntervalMs);

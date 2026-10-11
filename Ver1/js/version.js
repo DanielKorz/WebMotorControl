@@ -3,9 +3,72 @@
  * Bump APP_VERSION and add an entry at the top of APP_CHANGELOG for every behavioural change.
  * The version is shown in the header, logged to the console log at start-up and on connect.
  */
-const APP_VERSION = "1.8.0";
+const APP_VERSION = "1.11.2";
 
 const APP_CHANGELOG = [
+    {
+        version: "1.11.2",
+        date: "2026-10-11",
+        changes: [
+            "Settings popup: the current-gain labels ('Current gain, phase A' ...) stay on one line; 'Max output voltage amplitude' shortened to 'Max output voltage' so no label wraps."
+        ]
+    },
+    {
+        version: "1.11.1",
+        date: "2026-10-11",
+        changes: [
+            "Settings popup: pole pairs and encoder counts are fixed (shown, not editable); the three current gains are stacked in one column; the phase-advance switches are gone from the dialog (their stored values are written back unchanged)."
+        ]
+    },
+    {
+        version: "1.11.0",
+        date: "2026-10-11",
+        changes: [
+            "Settings... button: a popup to view and edit the settings stored in the controller (MSG_ID_CONFIG), like the Python app's settings window. Grouped into Motor, Power board and Application; same limits as the Python app; fields the firmware does not use yet are tagged. Includes the run-on-start speed (with a confirmation), Defaults (keeps supply, current limit and gains), Reload, and a read-back after Save that reports if the controller ignored the write."
+        ]
+    },
+    {
+        version: "1.10.4",
+        date: "2026-10-11",
+        changes: [
+            "Log decodes the new run-on-start state 5 (warning chirp + 1 s delay before the motor starts)."
+        ]
+    },
+    {
+        version: "1.10.3",
+        date: "2026-10-11",
+        changes: [
+            "Keep-alive no longer sends a 0 rpm demand: it repeats the demand only while it is not 0 rpm. A 0 rpm demand is a STOP to the controller (it also ends a run-on-start), so connecting no longer stops a motor that started by itself. An explicit stop is still sent at once and repeated 5 times (1 s) in case a message is lost."
+        ]
+    },
+    {
+        version: "1.10.2",
+        date: "2026-10-11",
+        changes: [
+            "Run on start: a STOP (0 rpm) sent from this page now takes the motor to idle. Note that the keep-alive demand at 0 rpm counts as a STOP, so with the Keep alive box ticked connecting stops a motor that started by itself."
+        ]
+    },
+    {
+        version: "1.10.1",
+        date: "2026-10-11",
+        changes: [
+            "Diagnostic log decodes the controller's run-on-start state (0x0180). While that mode is active the controller ignores speed targets from this page."
+        ]
+    },
+    {
+        version: "1.10.0",
+        date: "2026-10-09",
+        changes: [
+            "The Controller Info button is now Controller / Motor Info: it also reads the motor description (MSG_ID_MOTOR_INFO) - name, model, pole pairs, winding R and L, BEMF and torque constants, supply, calibration and voltage-control settings, field weakening, lead and the current/speed loop gains - and lists it in the log."
+        ]
+    },
+    {
+        version: "1.9.0",
+        date: "2026-10-09",
+        changes: [
+            "Controller Info button: reads the controller (power board) description from the drive (MSG_ID_CONTROLLER_INFO): name, model, hardware revision, shunt, amplifier gain, ADC reference, current and voltage scaling, overcurrent threshold, divider values - and lists them in the log."
+        ]
+    },
     {
         version: "1.8.0",
         date: "2026-10-06",

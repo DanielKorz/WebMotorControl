@@ -192,11 +192,13 @@
                 <div class="options-row">
                     <label class="chk-group">
                         <input id="chkPeriodic" type="checkbox" checked>
-                        <span>Keep alive (5 Hz)</span>
+                        <span title="Repeats the demand every 200 ms while it is not 0 rpm. A 0 rpm demand is a STOP for the controller, so it is only sent when you stop (5 times), never just because the page is connected.">Keep alive (5 Hz)</span>
                     </label>
                     <div class="action-buttons">
                         <button id="btnReqStatus" class="btn btn-secondary btn-sm" disabled title="Disabled - status is requested automatically on connect and re-requested if it stops">Request Status</button>
                         <button id="btnFindZero" class="btn btn-secondary btn-sm" disabled title="Disabled">Find Zero Index</button>
+                        <button id="btnControllerInfo" class="btn btn-secondary btn-sm" title="Read the controller (power board) and motor description from the drive: names, shunt, scaling, motor constants and gains">Controller / Motor Info</button>
+                        <button id="btnSettings" class="btn btn-secondary btn-sm" title="View and edit the settings stored in the controller (supply, limits, current gains, ramps, run on start ...)">Settings...</button>
                         <button id="btnSelfTest" class="btn btn-secondary btn-sm" title="Run the controller self-test (DIAG_REQ_SELFTEST); only starts while the controller is idle">Self-Test</button>
                     </div>
                 </div>
@@ -389,6 +391,25 @@
     <script src="js/diagcodes.js"></script>
     <script src="js/serial.js"></script>
     <script src="js/chart.js"></script>
+        <!-- Controller settings dialog (js/settings.js builds the form) -->
+    <div id="settingsModal" class="modal-overlay" hidden>
+        <div class="card modal-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+            <div class="card-title">
+                <span id="settingsTitle">Controller settings</span>
+                <button id="btnSettingsClose" class="btn btn-secondary btn-sm" type="button" aria-label="Close">&times;</button>
+            </div>
+            <div id="settingsStatus" class="settings-status">Not loaded.</div>
+            <form id="settingsForm" onsubmit="return false"></form>
+            <div class="settings-note">Calibration results (electrical zero, encoder direction, current offsets, angle table) are not edited here. Writing the settings saves them to the controller's flash, so stop the motor first.</div>
+            <div class="modal-footer">
+                <button id="btnSettingsDefaults" class="btn btn-secondary btn-sm" type="button" title="Fill the firmware defaults (supply, current limit and gains are kept); press Save to write them">Defaults</button>
+                <button id="btnSettingsReload" class="btn btn-secondary btn-sm" type="button">Reload</button>
+                <button id="btnSettingsSave" class="btn btn-primary btn-sm" type="button">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/settings.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
