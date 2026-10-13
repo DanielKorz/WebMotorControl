@@ -246,7 +246,7 @@ class WebSerialController {
     }
 
     setTargetRpm(rpm, sendImmediately = true) {
-        this.targetRpm = Math.max(0, Math.min(6000, Math.round(rpm)));
+        this.targetRpm = Math.max(-6000, Math.min(6000, Math.round(rpm)));    // the sign is the direction
         // An explicit stop (e.g. STOP button, slider back to 0) gets repeated by the keep-alive for a short while
         this._stopRepeatsLeft = (this.targetRpm === 0) ? this.stopRepeats : 0;
         if (sendImmediately && this.isConnected()) {

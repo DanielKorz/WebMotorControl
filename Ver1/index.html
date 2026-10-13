@@ -11,7 +11,7 @@
         // Both are read here, before first paint, so the page never flashes the wrong theme.
         (function () {
             var KEY = "motorctrl.theme";
-            var THEMES = ["python", "retro", "fresh"];
+            var THEMES = ["python", "retro", "fresh", "alpha"];
             var path = location.pathname.replace(/[^\/]*$/, "") || "/";
 
             function readCookie() {
@@ -56,6 +56,7 @@
                     <button id="themePython" class="theme-btn theme-python" type="button" title="Match the Python app theme" aria-label="Python app theme"></button>
                     <button id="themeRetro" class="theme-btn theme-retro" type="button" title="Retro 80s terminal theme" aria-label="Retro 80s terminal theme"></button>
                     <button id="themeFresh" class="theme-btn theme-fresh" type="button" title="Fresh modern dark theme" aria-label="Fresh modern dark theme"></button>
+                    <button id="themeAlpha" class="theme-btn theme-alpha" type="button" title="Alpha Machines theme (Midnight / Graphite, Ignition orange)" aria-label="Alpha Machines theme"></button>
                 </div>
                 <div id="statusBadge" class="status-badge disconnected">
                     <span class="status-dot"></span>
@@ -138,40 +139,66 @@
             </div>
         </div>
 
-        <!-- 2. Middle Section: Speed Demand Controls & Status Panel -->
-        <div class="middle-grid">
+        <!-- 2. Middle Section: velocity dial, velocity demand and status panel -->
+        <div class="middle-grid middle-grid--demand">
 
-            <!-- 2A. Speed Demand (0 - 6000 RPM) -->
+            <!-- 2.0 Shaft velocity dial (js/gauge.js, copied from the PyTesterApp web app) -->
+            <aside class="card gauge-card" aria-label="Shaft velocity">
+                <div id="gauge"></div>
+                <dl class="gmeta">
+                    <div><dt>Target</dt><dd><b id="gTarget">0</b> rpm</dd></div>
+                    <div><dt>Torque</dt><dd id="gTorque">-</dd></div>
+                    <div><dt>Iq</dt><dd id="gIq">-</dd></div>
+                </dl>
+            </aside>
+
+            <!-- 2A. Velocity demand (-6000 ... 6000 rpm, the sign is the direction) -->
             <div class="card demand-card">
                 <div class="card-title">
-                    <span>Speed Demand (0 - 6000 RPM)</span>
+                    <span>Velocity demand</span>
                 </div>
 
-                <!-- Big RPM Display + Numerical Input -->
+                <!-- Big rpm display + numerical input -->
                 <div class="rpm-readout-row">
-                    <div id="rpmDisplay" class="rpm-big-text">0 RPM</div>
+                    <div id="rpmDisplay" class="rpm-big-text">0 <small>rpm</small></div>
                     <div class="rpm-entry-group">
-                        <label for="rpmInput" class="form-label">Set RPM:</label>
-                        <input id="rpmInput" type="number" min="0" max="6000" step="50" value="0" class="text-input" style="width: 80px;">
+                        <label for="rpmInput" class="form-label">Set rpm:</label>
+                        <input id="rpmInput" type="text" inputmode="numeric" placeholder="0" autocomplete="off" class="text-input num-input" title="Type a value, press Enter or Apply; Esc clears">
                         <button id="btnApplyRpm" class="btn btn-secondary btn-sm">Apply</button>
                     </div>
                 </div>
 
-                <!-- Slider & Dynamic Ticks Canvas -->
-                <div class="slider-container">
-                    <input id="rpmSlider" type="range" min="0" max="6000" step="1" value="0" class="rpm-slider">
-                    <canvas id="ticksCanvas" class="ticks-canvas"></canvas>
+                <!-- Slider with step buttons, glow track and tick marks -->
+                <div class="slider-row">
+                    <div class="step-group">
+                        <button class="btn btn-secondary btn-sm" id="btnDown2" type="button" title="-20% of full scale">◀◀</button>
+                        <button class="btn btn-secondary btn-sm" id="btnDown1" type="button" title="-5% of full scale">◀</button>
+                    </div>
+                    <div class="slider-box" id="sliderBox">
+                        <div class="slider-fill" aria-hidden="true"></div>
+                        <input id="rpmSlider" type="range" min="-6000" max="6000" step="1" value="0" class="rpm-slider" aria-label="Target velocity">
+                        <div class="slider-ticks" id="sliderTicks"></div>
+                    </div>
+                    <div class="step-group">
+                        <button class="btn btn-secondary btn-sm" id="btnUp1" type="button" title="+5% of full scale">▶</button>
+                        <button class="btn btn-secondary btn-sm" id="btnUp2" type="button" title="+20% of full scale">▶▶</button>
+                    </div>
                 </div>
 
-                <!-- Quick Presets -->
+                <!-- Quick presets, Hold at the right end -->
                 <div class="preset-row">
-                    <button class="btn btn-stop btn-sm" data-rpm="0">STOP (0 RPM)</button>
+                    <button class="btn btn-stop btn-sm" data-rpm="0" title="Stop (Esc)">STOP (0 rpm)</button>
                     <button class="btn btn-secondary btn-sm" data-rpm="500">500</button>
                     <button class="btn btn-secondary btn-sm" data-rpm="1000">1000</button>
                     <button class="btn btn-secondary btn-sm" data-rpm="2000">2000</button>
                     <button class="btn btn-secondary btn-sm" data-rpm="3000">3000</button>
                     <button class="btn btn-secondary btn-sm" data-rpm="4500">4500</button>
                     <button class="btn btn-secondary btn-sm" data-rpm="6000">6000</button>
+                    <button class="btn btn-secondary btn-sm" data-rpm="-1000" title="1000 rpm in reverse">-1000</button>
+                    <label class="chk-group hold-group" title="Hold: the slider stays where you leave it when released. Without Hold it springs back to 0 and the motor stops.">
+                        <input id="chkHold" type="checkbox" checked>
+                        <span>Hold</span>
+                    </label>
                 </div>
 
                 <!-- Limits sent with every demand (latched by firmware at run start) -->
@@ -207,7 +234,7 @@
             <!-- 2B. Status Panel (CDataStatus) -->
             <div class="card">
                 <div class="card-title">
-                    <span>Status Panel (CDataStatus)</span>
+                    <span>Status</span>
                     <span id="statusAge" class="status-age"></span>
                 </div>
                 <div class="status-grid">
@@ -241,10 +268,6 @@
                             <label>torque_mNm:</label>
                             <input id="stat_torque_mNm" type="text" readonly value="-">
                         </div>
-                        <div class="status-field">
-                            <label>statusWord:</label>
-                            <input id="stat_statusWord" type="text" readonly value="-">
-                        </div>
                     </div>
 
                     <!-- Column 2 -->
@@ -276,10 +299,6 @@
                         <div class="status-field">
                             <label>motorTemp:</label>
                             <input id="stat_motorTemp" type="text" readonly value="-">
-                        </div>
-                        <div class="status-field">
-                            <label>faultWord:</label>
-                            <input id="stat_faultWord" type="text" readonly value="-">
                         </div>
                     </div>
                 </div>
@@ -391,6 +410,7 @@
     <script src="js/diagcodes.js"></script>
     <script src="js/serial.js"></script>
     <script src="js/chart.js"></script>
+    <script src="js/gauge.js"></script>
         <!-- Controller settings dialog (js/settings.js builds the form) -->
     <div id="settingsModal" class="modal-overlay" hidden>
         <div class="card modal-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">

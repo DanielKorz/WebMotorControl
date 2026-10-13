@@ -20,7 +20,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const rpmInput = document.getElementById("rpmInput");
     const btnApplyRpm = document.getElementById("btnApplyRpm");
     const rpmSlider = document.getElementById("rpmSlider");
-    const ticksCanvas = document.getElementById("ticksCanvas");
+    const sliderBox = document.getElementById("sliderBox");
+    const sliderTicks = document.getElementById("sliderTicks");
+    const chkHold = document.getElementById("chkHold");
+    const gTarget = document.getElementById("gTarget");
+    const gTorque = document.getElementById("gTorque");
+    const gIq = document.getElementById("gIq");
     const presetButtons = document.querySelectorAll(".preset-row button");
 
     const maxVInput = document.getElementById("maxVInput");
@@ -50,15 +55,13 @@ document.addEventListener("DOMContentLoaded", () => {
         supplyVoltage: document.getElementById("stat_supplyVoltage"),
         bemfVoltage: document.getElementById("stat_bemfVoltage"),
         torque_mNm: document.getElementById("stat_torque_mNm"),
-        statusWord: document.getElementById("stat_statusWord"),
         iq: document.getElementById("stat_iq"),
         id: document.getElementById("stat_id"),
         vq: document.getElementById("stat_vq"),
         vd: document.getElementById("stat_vd"),
         vdq: document.getElementById("stat_vdq"),
         pcbTemp: document.getElementById("stat_pcbTemp"),
-        motorTemp: document.getElementById("stat_motorTemp"),
-        faultWord: document.getElementById("stat_faultWord")
+        motorTemp: document.getElementById("stat_motorTemp")
     };
 
     // ---------------- 2. WebSerial Controller Setup ----------------
@@ -133,12 +136,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ---------------- Theme ----------------
     // "default" is the original look; "python" follows the Python app's colours; "retro" is an
-    // 80s green-phosphor terminal and "fresh" a modern dark glass UI (all in style.css).
+    // 80s green-phosphor terminal, "fresh" a modern dark glass UI and "alpha" the Alpha Machines look (all in style.css).
     const THEME_BUTTONS = {
         default: document.getElementById("themeDefault"),
         python: document.getElementById("themePython"),
         retro: document.getElementById("themeRetro"),
-        fresh: document.getElementById("themeFresh")
+        fresh: document.getElementById("themeFresh"),
+        alpha: document.getElementById("themeAlpha")
     };
 
     function applyTheme(name, save = true) {
@@ -152,7 +156,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (save) {
             if (window.ThemeStore) window.ThemeStore.set(name); // localStorage + cookie, see index.html
         }
-        drawSliderTicks(); // the tick marks are canvas-drawn, so they need the new colours
     }
 
     Object.entries(THEME_BUTTONS).forEach(([key, btn]) => btn.addEventListener("click", () => applyTheme(key)));
@@ -187,39 +190,78 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // ---------------- 4. Speed Demand Controls ----------------
-    function setTargetRpm(val, sendImmediately = true) {
-        const rpm = Math.max(0, Math.min(6000, Math.round(val)));
+    // ---------------- 4. Velocity demand + dial ----------------
+    // The dial (js/gauge.js, as in the PyTesterApp web app) shows the measured speed with a needle and the demand
+    // with a small marker. The slider glows from zero to the thumb in the dial's colours.
+    const FULL_SCALE = 6000;
+    const gauge = new SpeedGauge(document.getElementById("gauge"), { max: FULL_SCALE, reverse: true });
+    let demandRpm = 0;
+
+    function showTarget(rpm) {
+        demandRpm = rpm;
         rpmSlider.value = rpm;
-        rpmInput.value = rpm;
-        rpmDisplay.textContent = `${rpm} RPM`;
+        rpmDisplay.innerHTML = `${rpm} <small>rpm</small>`;
+        gTarget.textContent = rpm;
+        gauge.setTarget(rpm);
+        // the glow runs from zero (the middle of the track) to the thumb: green to the right, red to the left
+        const f = Math.min(1, Math.abs(rpm) / FULL_SCALE);
+        const span = 2 * FULL_SCALE;
+        const f0 = FULL_SCALE / span;
+        const f1 = (rpm + FULL_SCALE) / span;
+        sliderBox.style.setProperty("--a", Math.min(f0, f1).toFixed(5));
+        sliderBox.style.setProperty("--w", Math.abs(f1 - f0).toFixed(5));
+        sliderBox.style.setProperty("--k", f.toFixed(3));
+        sliderBox.dataset.dir = rpm > 0 ? "fwd" : rpm < 0 ? "rev" : "";
+    }
+
+    function setTargetRpm(val, sendImmediately = true) {
+        const rpm = Math.max(-FULL_SCALE, Math.min(FULL_SCALE, Math.round(val)));
+        showTarget(rpm);
         serial.setTargetRpm(rpm, sendImmediately);
     }
 
     // Slider input (while dragging)
-    rpmSlider.addEventListener("input", (e) => {
-        const rpm = parseInt(e.target.value, 10);
-        rpmDisplay.textContent = `${rpm} RPM`;
-        rpmInput.value = rpm;
-        serial.setTargetRpm(rpm, true);
-    });
+    rpmSlider.addEventListener("input", (e) => setTargetRpm(parseInt(e.target.value, 10), true));
+
+    // Released: without Hold the slider springs back to 0 and the motor stops
+    rpmSlider.addEventListener("change", () => { if (!chkHold.checked) setTargetRpm(0, true); });
+    chkHold.addEventListener("change", () => { if (!chkHold.checked) setTargetRpm(0, true); });
+
+    // Step buttons: -/+ 20 % and 5 % of full scale
+    function stepTarget(pct) {
+        setTargetRpm(demandRpm + Math.round(FULL_SCALE * pct / 100), true);
+    }
+    document.getElementById("btnUp2").addEventListener("click", () => stepTarget(+20));
+    document.getElementById("btnUp1").addEventListener("click", () => stepTarget(+5));
+    document.getElementById("btnDown1").addEventListener("click", () => stepTarget(-5));
+    document.getElementById("btnDown2").addEventListener("click", () => stepTarget(-20));
 
     // Direct entry Apply
     function applyInputRpm() {
-        const val = parseInt(rpmInput.value, 10);
-        if (!isNaN(val)) {
-            setTargetRpm(val, true);
-        } else {
-            rpmInput.value = rpmSlider.value;
+        const text = rpmInput.value.trim();
+        if (/^-?\d+$/.test(text)) {
+            setTargetRpm(parseInt(text, 10), true);
+            rpmInput.value = "";
         }
     }
 
     btnApplyRpm.addEventListener("click", applyInputRpm);
     rpmInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
+            e.preventDefault();
             applyInputRpm();
+        } else if (e.key === "Escape") {
+            rpmInput.value = "";
         }
     });
+    rpmInput.addEventListener("input", () => { rpmInput.value = rpmInput.value.replace(/(?!^-)[^\d]/g, ""); });
+
+    // Esc stops from anywhere on the page
+    document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape" || e.repeat) return;
+        if (demandRpm !== 0) appendLog("[CONTROL] Esc: stop\n");
+        setTargetRpm(0, true);
+    }, true);
 
     // Preset buttons
     presetButtons.forEach(btn => {
@@ -298,81 +340,17 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     applyMotorPreset(motorId, false);
 
-    // ---------------- 5. Canvas Slider Ticks ----------------
-    function drawSliderTicks() {
-        const canvas = ticksCanvas;
-        const ctx = canvas.getContext("2d");
-        const dpr = window.devicePixelRatio || 1;
-        const rect = canvas.getBoundingClientRect();
-
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-        ctx.scale(dpr, dpr);
-
-        const w = rect.width;
-        if (w <= 20) return;
-
-        ctx.clearRect(0, 0, w, rect.height);
-
-        const margin = 8;
-        const span = w - 2 * margin;
-
-        const css = getComputedStyle(document.documentElement);
-        const tickMajor = css.getPropertyValue("--tick-major").trim() || "#4a5568";
-        const tickMinor = css.getPropertyValue("--tick-minor").trim() || "#a0aec0";
-        const tickText = css.getPropertyValue("--tick-text").trim() || "#2d3748";
-
-        // Minor ticks every 500 RPM
-        for (let rpm = 0; rpm <= 6000; rpm += 500) {
-            const x = margin + (rpm / 6000) * span;
-            const isMajor = (rpm % 1000 === 0);
-
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, isMajor ? 6 : 3);
-            ctx.strokeStyle = isMajor ? tickMajor : tickMinor;
-            ctx.lineWidth = 1;
-            ctx.stroke();
+    // ---------------- 5. Slider tick marks ----------------
+    // A short mark every 1000 rpm, a labelled one every 2000, zero picked out. Each sits at its fraction of the range
+    // (the --f variable); the stylesheet adds the thumb's half-width at both ends so they line up with the thumb.
+    (function buildSliderTicks() {
+        const marks = [];
+        for (let v = -FULL_SCALE; v <= FULL_SCALE; v += 1000) {
+            const major = v % 2000 === 0;
+            marks.push(`<div class="tick${major ? " major" : ""}${v === 0 ? " zero" : ""}" style="--f:${((v + FULL_SCALE) / (2 * FULL_SCALE)).toFixed(5)}"><i></i>${major ? `<span>${v}</span>` : ""}</div>`);
         }
-
-        // Labels for major ticks
-        const ticks = [
-            { rpm: 0, text: "0 RPM", align: "left" },
-            { rpm: 1000, text: "1000", align: "center" },
-            { rpm: 2000, text: "2000", align: "center" },
-            { rpm: 3000, text: "3000", align: "center" },
-            { rpm: 4000, text: "4000", align: "center" },
-            { rpm: 5000, text: "5000", align: "center" },
-            { rpm: 6000, text: "6000 RPM", align: "right" }
-        ];
-
-        ctx.font = "10px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillStyle = tickText;
-
-        ticks.forEach(({ rpm, text, align }) => {
-            const x = margin + (rpm / 6000) * span;
-            ctx.textAlign = align;
-            ctx.fillText(text, x, 20);
-        });
-    }
-
-    // Click on ticks canvas to set slider value
-    ticksCanvas.addEventListener("click", (e) => {
-        const rect = ticksCanvas.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const margin = 8;
-        const span = rect.width - 2 * margin;
-
-        if (span > 0) {
-            const ratio = (clickX - margin) / span;
-            const rpm = Math.round(Math.max(0, Math.min(1, ratio)) * 6000);
-            setTargetRpm(rpm, true);
-        }
-    });
-
-    window.addEventListener("resize", drawSliderTicks);
-    // Initial draw after layout
-    setTimeout(drawSliderTicks, 50);
+        sliderTicks.innerHTML = marks.join("");
+    })();
 
     applyTheme(document.documentElement.getAttribute("data-theme") || "default", false);
 
@@ -455,11 +433,13 @@ document.addEventListener("DOMContentLoaded", () => {
         statusInputs.tickCount.value = `${s.tickCount} (${timeStr})`;
         statusInputs.version.value = `${(s.version / 100).toFixed(2)}`;
         statusInputs.rpm.value = `${s.rpm} RPM`;
+        gauge.setSpeed(s.rpm);
+        gTorque.textContent = `${(s.torque_mNm / 1000).toFixed(3)} Nm`;
+        gIq.textContent = `${s.iq} mA`;
         statusInputs.encoderValue.value = `${s.encoderValue}`;
         statusInputs.supplyVoltage.value = `${(s.supplyVoltage / 1000).toFixed(2)} V`;
         statusInputs.bemfVoltage.value = `${(s.bemfVoltage / 1000).toFixed(2)} V (${s.bemfVoltage} mV)`;
         statusInputs.torque_mNm.value = `${(s.torque_mNm / 1000).toFixed(3)} Nm`;
-        statusInputs.statusWord.value = `0x${s.statusWord.toString(16).padStart(8, '0').toUpperCase()}`;
 
         statusInputs.iq.value = `${s.iq} mA`;
         statusInputs.id.value = `${s.id} mA`;
@@ -477,7 +457,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         statusInputs.pcbTemp.value = `${(s.pcbTemp / 1000).toFixed(1)} °C`;
         statusInputs.motorTemp.value = `${(s.motorTemp / 1000).toFixed(1)} °C`;
-        statusInputs.faultWord.value = `0x${s.faultWord.toString(16).padStart(8, '0').toUpperCase()}`;
 
         updateFaultPanel(s.statusWord);
 
@@ -548,6 +527,9 @@ document.addEventListener("DOMContentLoaded", () => {
             el.value = "-";
             el.classList.remove("warn");
         });
+        gauge.setSpeed(0);
+        gTorque.textContent = "-";
+        gIq.textContent = "-";
         statusAge.classList.remove("stale");
         statusAge.textContent = connected ? "waiting for status…" : "";
     }

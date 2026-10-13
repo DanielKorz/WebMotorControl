@@ -14,7 +14,7 @@ body {
 }
 
 .app-container {
-    max-width: 1240px;
+    max-width: 1400px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
@@ -230,39 +230,22 @@ body {
 }
 
 .rpm-big-text {
-    font-size: 32px;
+    font-size: 40px;
     font-weight: 800;
+    line-height: 1;
     color: #0066cc;
     letter-spacing: -0.5px;
+}
+
+.rpm-big-text small {
+    font-size: 28px;
+    font-weight: 800;
 }
 
 .rpm-entry-group {
     display: flex;
     align-items: center;
     gap: 6px;
-}
-
-.slider-container {
-    width: 100%;
-    padding: 4px 0;
-}
-
-.rpm-slider {
-    width: 100%;
-    height: 8px;
-    border-radius: 4px;
-    outline: none;
-    background: #d8dde6;
-    cursor: pointer;
-    margin: 8px 0 0 0;
-}
-
-.ticks-canvas {
-    width: 100%;
-    height: 28px;
-    display: block;
-    cursor: pointer;
-    user-select: none;
 }
 
 .preset-row {
@@ -292,14 +275,24 @@ body {
 
 .action-buttons {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
 }
 
-/* Status Panel (CDataStatus) */
+.action-buttons .btn {
+    white-space: nowrap;
+}
+
+/* Status panel: one column of fields */
 .status-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px 14px;
+    grid-template-columns: 1fr;
+    gap: 6px;
+}
+
+.status-col {
+    display: grid;
+    gap: 6px;
 }
 
 @media (max-width: 540px) {
@@ -807,24 +800,25 @@ html[data-theme="python"] .fault-chip {
 /* Swatches for the two additional themes */
 .theme-retro { background: linear-gradient(135deg, #33ff33 50%, #000000 50%); }
 .theme-fresh { background: linear-gradient(135deg, #6366f1 50%, #22d3ee 50%); }
+.theme-alpha { background: linear-gradient(135deg, #0a0f1e 50%, #f5710a 50%); }
 
 /* ------------------------------------------------------------------ */
 /* Dark themes ("retro" and "fresh") share one set of rules driven by   */
 /* the design tokens each theme defines further down.                   */
 /* ------------------------------------------------------------------ */
-html:is([data-theme="retro"], [data-theme="fresh"]) {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) {
     color-scheme: dark;
     accent-color: var(--accent);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) body {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) body {
     background: var(--bg);
     background-attachment: fixed;
     color: var(--text);
     font-family: var(--font);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .card {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .card {
     background: var(--card-bg);
     border: 1px solid var(--card-border);
     border-radius: var(--radius);
@@ -833,164 +827,160 @@ html:is([data-theme="retro"], [data-theme="fresh"]) .card {
     backdrop-filter: var(--card-blur);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) :is(.card-title, .app-title, .port-config-title, .form-label, .status-field label, .group-label, .chk-group) {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) :is(.card-title, .app-title, .port-config-title, .form-label, .status-field label, .group-label, .chk-group) {
     color: var(--title);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .card-title {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .card-title {
     border-bottom-color: var(--rule);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .port-config-section {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .port-config-section {
     background: var(--section-bg);
     border-color: var(--rule);
     border-radius: var(--radius-sm);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) :is(.conn-stats, .options-row) {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) :is(.conn-stats, .options-row) {
     border-top-color: var(--rule);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) :is(.conn-stats-counters, .rx-diag, .limit-hint, .card-hint, .legend-item) {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) :is(.conn-stats-counters, .rx-diag, .limit-hint, .card-hint, .legend-item) {
     color: var(--muted);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .legend-item b {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .legend-item b {
     color: var(--text);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) :is(.select-input, .text-input, .status-field input) {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) :is(.select-input, .text-input, .status-field input) {
     background: var(--input-bg);
     border: 1px solid var(--input-border);
     color: var(--input-text);
     border-radius: var(--radius-sm);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) :is(.select-input, .text-input):focus {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) :is(.select-input, .text-input):focus {
     border-color: var(--accent);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .rpm-big-text {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .rpm-big-text {
     color: var(--rpm-color);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .rpm-slider {
-    background: var(--slider-bg);
-}
-
 /* Buttons */
-html:is([data-theme="retro"], [data-theme="fresh"]) .btn {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .btn {
     background: var(--btn-bg);
     color: var(--btn-text);
     border: 1px solid var(--btn-border);
     border-radius: var(--radius-sm);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .btn:hover:not(:disabled) {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .btn:hover:not(:disabled) {
     background: var(--btn-hover);
     color: var(--btn-hover-text);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .btn:active:not(:disabled) {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .btn:active:not(:disabled) {
     background: var(--btn-active);
     color: var(--btn-hover-text);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .btn:disabled {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .btn:disabled {
     opacity: 0.4;
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .btn-primary {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .btn-primary {
     background: var(--primary-bg);
     color: var(--primary-text);
     border-color: var(--primary-border);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .btn-primary:hover:not(:disabled) {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .btn-primary:hover:not(:disabled) {
     background: var(--primary-bg);
     color: var(--primary-text);
     filter: brightness(1.15);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .btn-danger {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .btn-danger {
     background: var(--danger-bg);
     color: var(--danger-text);
     border-color: var(--danger-border);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .btn-danger:hover:not(:disabled) {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .btn-danger:hover:not(:disabled) {
     background: var(--danger-bg);
     color: var(--danger-text);
     filter: brightness(1.15);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .btn-stop {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .btn-stop {
     background: var(--stop-bg);
     color: var(--stop-text);
     border-color: var(--stop-border);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .btn-stop:hover:not(:disabled) {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .btn-stop:hover:not(:disabled) {
     background: var(--stop-hover);
     color: var(--stop-hover-text);
 }
 
 /* Badges, alerts, indicators */
-html:is([data-theme="retro"], [data-theme="fresh"]) .status-badge.connected {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .status-badge.connected {
     background: var(--ok-bg);
     color: var(--ok-text);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .status-badge.disconnected {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .status-badge.disconnected {
     background: var(--bad-bg);
     color: var(--bad-text);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .alert-warning {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .alert-warning {
     background: var(--warn-bg);
     border-color: var(--warn-border);
     color: var(--warn-text);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .fault-chip {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .fault-chip {
     background: var(--chip-bg);
     color: var(--chip-text);
     border: 1px solid var(--chip-border);
     border-radius: var(--radius-sm);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .fault-chip.fault.active {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .fault-chip.fault.active {
     background: #ef0000;
     color: #ffffff;
     border-color: #ff6b6b;
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .fault-chip.warning.active {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .fault-chip.warning.active {
     background: #ffaa00;
     color: #000000;
     border-color: #ffd37a;
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .theme-btn {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .theme-btn {
     border-color: var(--rule);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .theme-btn[aria-pressed="true"] {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .theme-btn[aria-pressed="true"] {
     border-color: var(--text);
     box-shadow: 0 0 0 2px var(--rule);
 }
 
 /* Log */
-html:is([data-theme="retro"], [data-theme="fresh"]) .log-console {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .log-console {
     background: var(--log-bg);
     color: var(--log-text);
     border: 1px solid var(--log-border);
     border-radius: var(--radius-sm);
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .log-normal { color: var(--log-text); }
-html:is([data-theme="retro"], [data-theme="fresh"]) .log-seq { color: var(--muted); }
-html:is([data-theme="retro"], [data-theme="fresh"]) .log-highlight { box-shadow: inset 0 0 0 1px var(--muted); }
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .log-normal { color: var(--log-text); }
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .log-seq { color: var(--muted); }
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .log-highlight { box-shadow: inset 0 0 0 1px var(--muted); }
 
 /* ------------------------------------------------------------------ */
 /* Theme: retro - 1980s green-phosphor CRT terminal                     */
@@ -1178,6 +1168,82 @@ html[data-theme="fresh"] .card-title {
     letter-spacing: 0.01em;
 }
 
+/* ------------------------------------------------------------------ */
+/* Theme: alpha - the Alpha Machines design system (copied from the     */
+/* PyTesterApp web app): Midnight / Graphite surfaces, Ignition orange   */
+/* as the accent, solid red STOP, 4 / 8 px radii                         */
+/* ------------------------------------------------------------------ */
+html[data-theme="alpha"] {
+    --accent: #f5710a;
+    --bg: #0a0f1e;
+    --text: #e8ecf4;
+    --title: #e8ecf4;
+    --muted: #9ca3af;
+    --font: Inter, -apple-system, "Segoe UI", system-ui, sans-serif;
+    --radius: 8px;
+    --radius-sm: 4px;
+    --card-bg: #1a1f2e;
+    --card-border: #2d3348;
+    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --card-blur: none;
+    --rule: #2d3348;
+    --section-bg: #232a3d;
+    --input-bg: #0a0f1e;
+    --input-border: #4a5068;
+    --input-text: #e8ecf4;
+    --btn-bg: #232a3d;
+    --btn-text: #e8ecf4;
+    --btn-border: #4a5068;
+    --btn-hover: #2d3550;
+    --btn-hover-text: #ffffff;
+    --btn-active: #3a4260;
+    --primary-bg: #f5710a;
+    --primary-text: #0a0f1e;
+    --primary-border: #f5710a;
+    --danger-bg: #ef4444;
+    --danger-text: #ffffff;
+    --danger-border: #ef4444;
+    --stop-bg: #ef4444;
+    --stop-text: #ffffff;
+    --stop-border: #ef4444;
+    --stop-hover: #dc2626;
+    --stop-hover-text: #ffffff;
+    --rpm-color: #f5710a;
+    --slider-bg: #2d3348;
+    --log-bg: #0a0f1e;
+    --log-text: #e8ecf4;
+    --log-border: #2d3348;
+    --chip-bg: #232a3d;
+    --chip-text: #6b7280;
+    --chip-border: #2d3348;
+    --ok-bg: #0e3a2c;
+    --ok-text: #34d399;
+    --bad-bg: #3a1c22;
+    --bad-text: #ff8a8a;
+    --warn-bg: rgba(245, 158, 11, 0.14);
+    --warn-border: rgba(245, 158, 11, 0.4);
+    --warn-text: #f59e0b;
+
+    --chart-grid: #232a3d;
+    --chart-grid-minor: #1a1f2e;
+    --chart-zero: #4a5068;
+    --chart-text: #9ca3af;
+    --chart-title: #e8ecf4;
+    --chart-border: #4a5068;
+    --chart-hint: #6b7280;
+    --chart-id: #3b82f6;
+    --chart-iq: #f5710a;
+    --chart-vd: #10b981;
+    --chart-vq: #ffb366;
+    --tick-minor: #4a5068;
+    --tick-major: #9ca3af;
+    --tick-text: #9ca3af;
+}
+
+html[data-theme="alpha"] .btn:hover:not(:disabled) {
+    filter: brightness(1.15);
+}
+
 /* Footer with the company logo (kept to the height of a text box, 28px) */
 .app-footer {
     display: flex;
@@ -1199,7 +1265,7 @@ html[data-theme="python"] .app-footer {
     color: #40513b;
 }
 
-html:is([data-theme="retro"], [data-theme="fresh"]) .app-footer {
+html:is([data-theme="retro"], [data-theme="fresh"], [data-theme="alpha"]) .app-footer {
     color: var(--muted);
 }
 
@@ -1336,3 +1402,140 @@ html:is([data-theme="retro"], [data-theme="fresh"]) .app-footer {
 .settings-row.fixed .text-input {
     opacity: 0.7;
 }
+
+/* ------------------------------------------------------------------ */
+/* Velocity dial + velocity demand panel (style of the PyTesterApp web  */
+/* app). Colours come from the --dm-* / --gauge-* tokens set per theme. */
+/* ------------------------------------------------------------------ */
+:root {
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --dm-accent: #0066cc;
+    --dm-track: #d8dde6;
+    --dm-ring: #ffffff;
+    --dm-axis: #a0aec0;
+    --dm-text: #2d3748;
+    --dm-muted: #667085;
+    --dm-rule: #ebeef5;
+    --gauge-bg: #232a36; --gauge-base: #1a1f29; --gauge-fg: #e6e9f0; --gauge-value: #ffffff;
+    --gauge-fwd: #4caf50; --gauge-rev: #c0392b; --gauge-needle: #22d3ee;
+}
+
+html[data-theme="python"] {
+    --dm-accent: #2c5ead; --dm-track: #c3cba9; --dm-ring: #edf1d6; --dm-axis: #6b7a5e; --dm-text: #40513b; --dm-muted: #5f705a; --dm-rule: #c5ccae;
+}
+
+html[data-theme="retro"] {
+    --font-ui: var(--font);
+    --dm-accent: #ffb000; --dm-track: #0f3d0f; --dm-ring: #041404; --dm-axis: #146014; --dm-text: #33ff33; --dm-muted: #1fa81f; --dm-rule: #146014;
+    --gauge-bg: #000000; --gauge-base: #000000; --gauge-fg: #33ff66; --gauge-value: #33ff66;
+    --gauge-fwd: #33ff66; --gauge-rev: #ff3b3b; --gauge-needle: #ffd000;
+}
+
+html[data-theme="fresh"] {
+    --font-ui: var(--font);
+    --dm-accent: #7dd3fc; --dm-track: rgba(255, 255, 255, 0.14); --dm-ring: #1b2140; --dm-axis: rgba(255, 255, 255, 0.5); --dm-text: #9aa4c7; --dm-muted: #9aa4c7; --dm-rule: rgba(255, 255, 255, 0.1);
+    --gauge-bg: #0a0f1e; --gauge-base: #05080f; --gauge-fg: #e8ecf4; --gauge-value: #ffffff;
+    --gauge-fwd: #10b981; --gauge-rev: #ef4444; --gauge-needle: #22d3ee;
+}
+
+html[data-theme="alpha"] {
+    --font-ui: var(--font);
+    --dm-accent: #f5710a; --dm-track: #2d3348; --dm-ring: #1a1f2e; --dm-axis: #4a5068; --dm-text: #e8ecf4; --dm-muted: #9ca3af; --dm-rule: #2d3348;
+    --gauge-bg: #0a0f1e; --gauge-base: #05080f; --gauge-fg: #e8ecf4; --gauge-value: #ffffff;
+    --gauge-fwd: #10b981; --gauge-rev: #ef4444; --gauge-needle: #f5710a;
+}
+
+/* Layout: dial | velocity demand | status */
+.middle-grid--demand {
+    grid-template-columns: 340px minmax(0, 1fr) 280px;
+    align-items: stretch;      /* dial, demand and status cards all take the height of the tallest (status) */
+}
+
+@media (max-width: 1100px) {
+    .middle-grid--demand { grid-template-columns: 300px minmax(0, 1fr); }
+    .middle-grid--demand > :nth-child(3) { grid-column: 1 / -1; }
+    .middle-grid--demand > :nth-child(3) .status-grid { grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+}
+
+@media (max-width: 860px) {
+    .middle-grid--demand { grid-template-columns: 1fr; }
+    .middle-grid--demand > .gauge-card { max-width: 340px; margin: 0 auto; width: 100%; }
+}
+
+/* Dial */
+.gauge-card { padding: 12px; display: flex; flex-direction: column; }
+#gauge { margin-top: auto; }  /* dial and readings sit in the middle of the (stretched) card */
+#gauge svg { width: 100%; height: auto; display: block; }
+.gmeta { margin: 0 0 auto; padding-top: 8px; display: grid; gap: 2px; font-size: 12px; }
+.gmeta > div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--dm-rule); padding: 2px 0; }
+.gmeta dt { color: var(--dm-muted); }
+.gmeta dd { margin: 0; font-family: Consolas, "SFMono-Regular", monospace; }
+
+.g-dial   { fill: var(--gauge-bg); }
+.g-arc    { fill: none; stroke-width: 9; stroke-linecap: butt; }
+.g-glow   { fill: none; stroke-width: 15; stroke-linecap: butt; }
+.g-fwd    { stroke: var(--gauge-fwd); }
+.g-rev    { stroke: var(--gauge-rev); }
+.g-tick   { stroke: var(--gauge-fg); stroke-width: 1; opacity: .7; }
+.g-major  { stroke-width: 1.6; opacity: 1; }
+.g-num    { fill: var(--gauge-fg); font: 11px var(--font-ui); opacity: .85; }
+.g-title  { fill: var(--gauge-fg); font: 13px var(--font-ui); opacity: .8; }
+.g-needle { stroke: var(--gauge-needle); stroke-width: 3; stroke-linecap: round; }
+.g-hub    { fill: var(--gauge-needle); }
+.g-marker { fill: var(--gauge-fg); }
+.g-base   { fill: var(--gauge-base); }
+.g-value  { fill: var(--gauge-value); font: 800 30px var(--font-ui); }
+.g-unit   { fill: var(--gauge-fg); font: 14px var(--font-ui); opacity: .85; }
+
+/* Demand: set box, slider row, presets */
+.num-input { width: 112px; text-align: right; font-family: Consolas, "SFMono-Regular", monospace; padding: 6px 8px; }
+.slider-row { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0; }
+.step-group { display: flex; gap: 6px; }
+.step-group .btn { min-width: 40px; }
+.slider-box { flex: 1; min-width: 0; position: relative; }
+.slider-box[data-dir="fwd"] { --c: var(--gauge-fwd); }
+.slider-box[data-dir="rev"] { --c: var(--gauge-rev); }
+
+/* the track is drawn here (so the glow can sit on it): a base line, the coloured fill from zero to the thumb, then the slider on top.
+   A value v sits at  thumb/2 + (v - min)/(max - min) * (width - thumb)  from the left edge, with a 16 px thumb. */
+.slider-box::before { content: ""; position: absolute; left: 0; right: 0; top: 16px; height: 4px; border-radius: 2px; background: var(--dm-track); }
+.slider-fill {
+    position: absolute; top: 16px; height: 4px; border-radius: 2px; pointer-events: none; opacity: 0;
+    left: calc(8px + (100% - 16px) * var(--a, 0)); width: calc((100% - 16px) * var(--w, 0));
+    background: var(--c, transparent);
+    box-shadow: 0 0 calc(3px + 12px * var(--k, 0)) calc(1px + 2px * var(--k, 0)) var(--c, transparent);
+}
+.slider-box[data-dir="fwd"] .slider-fill, .slider-box[data-dir="rev"] .slider-fill { opacity: 1; }
+
+.rpm-slider {
+    -webkit-appearance: none; appearance: none;
+    position: relative; z-index: 1; display: block;
+    width: 100%; height: 20px; margin: 8px 0 0; padding: 0;
+    border-radius: 0; background: transparent; cursor: pointer;
+}
+.rpm-slider:focus { outline: none; }
+.rpm-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: transparent; }
+.rpm-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%;
+    background: var(--dm-accent); border: 2px solid var(--dm-ring);
+    box-shadow: 0 0 0 1px var(--c, var(--dm-accent)), 0 0 calc(2px + 14px * var(--k, 0)) var(--c, transparent);
+}
+.rpm-slider::-moz-range-track { height: 4px; border-radius: 2px; background: transparent; }
+.rpm-slider::-moz-range-thumb {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--dm-accent); border: 2px solid var(--dm-ring);
+    box-shadow: 0 0 0 1px var(--c, var(--dm-accent)), 0 0 calc(2px + 14px * var(--k, 0)) var(--c, transparent);
+}
+.rpm-slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px color-mix(in srgb, var(--dm-accent) 40%, transparent); }
+
+.slider-ticks { position: relative; height: 30px; margin: 2px 0 6px; color: var(--dm-muted); font-size: 11px; }
+.tick { position: absolute; top: 0; left: calc(8px + (100% - 16px) * var(--f)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
+.tick i { display: block; width: 1px; height: 5px; background: var(--dm-axis); }
+.tick.major i { height: 9px; width: 1.5px; }
+.tick.zero i { background: var(--dm-accent); height: 11px; width: 2px; }
+.tick.zero span { color: var(--dm-text); font-weight: 700; }
+
+.hold-group { margin-left: auto; }
+
+/* the demand card is as tall as the status card: the spare room opens up above the limits and keep-alive rows */
+.demand-card .limits-row { margin-top: auto; }

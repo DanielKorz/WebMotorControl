@@ -3,9 +3,45 @@
  * Bump APP_VERSION and add an entry at the top of APP_CHANGELOG for every behavioural change.
  * The version is shown in the header, logged to the console log at start-up and on connect.
  */
-const APP_VERSION = "1.11.2";
+const APP_VERSION = "1.14.0";
 
 const APP_CHANGELOG = [
+    {
+        version: "1.14.0",
+        date: "2026-10-13",
+        changes: [
+            "New 'alpha' theme (Alpha Machines: Midnight / Graphite surfaces, Ignition orange accent) copied from the PyTesterApp web app; fourth swatch in the header."
+        ]
+    },
+    {
+        version: "1.13.2",
+        date: "2026-10-13",
+        changes: [
+            "Bigger velocity dial (the velocity demand panel is narrower to make room); statusWord and faultWord removed from the status panel (the faults panel still shows the bits)."
+        ]
+    },
+    {
+        version: "1.13.1",
+        date: "2026-10-13",
+        changes: [
+            "Status panel is one column and titled just \"Status\"; the dial, velocity demand and status panels are the same height."
+        ]
+    },
+    {
+        version: "1.13.0",
+        date: "2026-10-13",
+        changes: [
+            "Reverse: the velocity demand is now -6000 ... +6000 rpm (the sign is the direction, as in the Python app). The slider has zero in the middle and glows red to the left, the dial shows the reverse side, a -1000 preset was added, and the typed value may be negative. Passing through 0 stops the motor."
+        ]
+    },
+    {
+        version: "1.12.0",
+        date: "2026-10-13",
+        changes: [
+            "Shaft velocity dial (from the PyTesterApp web app) beside the demand panel: needle = measured rpm, marker = demand, with target / torque / Iq below it.",
+            "Velocity demand panel restyled to match: big rpm readout, glowing slider track with tick marks, step buttons (-/+ 20 % and 5 %), Hold checkbox (default on = slider stays where it is left; off = springs back to 0 and stops), Esc stops. All four themes."
+        ]
+    },
     {
         version: "1.11.2",
         date: "2026-10-11",
